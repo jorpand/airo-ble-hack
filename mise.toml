@@ -25,8 +25,9 @@ AIRO_VENV = "{{config_root}}/.venv"
 AIRO_PYTHON = "{{config_root}}/.venv/bin/python"
 #: El puerto de la API web. El proxy de Vite y la interfaz apuntan aqui.
 AIRO_PUERTO = "8100"
-#: El puerto serie del ESP32-S3 (el del puente UART, no el USB nativo).
-AIRO_SERIAL = "/dev/ttyUSB0"
+#: El puerto serie del ESP32-S3. Vacio = se busca solo el primero que
+#: aparezca (ttyACM* para el USB nativo, ttyUSB* para el puente UART).
+AIRO_SERIAL = ""
 #: El firmware de MicroPython para el ESP32-S3 con PSRAM octal.
 AIRO_FIRMWARE = "{{env.HOME}}/cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.26.1.bin"
 
@@ -102,10 +103,21 @@ rm -rf .pytest_cache .ruff_cache web/dist
 
 [tasks.firmware-flash]
 description = "Flashea el firmware de MicroPython en el ESP32-S3"
-#: El puerto serie es AIRO_SERIAL (mise.toml). Con la placa en el USB nativo
-#: hay que mantener pulsado BOOT al resetear; con el UART se hace solo.
-run = "$AIRO_PYTHON -m esptool --chip esp32s3 --port $AIRO_SERIAL write_flash 0x0 $AIRO_FIRMWARE"
+#: El puerto es AIRO_SERIAL (mise.toml); si esta vacio, se busca el primero
+#: que aparezca. Con la placa en el USB nativo hay que mantener pulsado BOOT
+#: al resetear; con el UART se hace solo.
+run = """
+PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
+if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
+echo "Puerto: $PUERTO"
+$AIRO_PYTHON -m esptool --chip esp32s3 --port "$PUERTO" write_flash 0x0 $AIRO_FIRMWARE
+"""
 
 [tasks.firmware-run]
 description = "Ejecuta el spike del puente en el ESP32-S3"
-run = "$AIRO_PYTHON -m mpremote connect $AIRO_SERIAL run {{config_root}}/firmware/esp32/main.py"
+run = """
+PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
+if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
+echo "Puerto: $PUERTO"
+$AIRO_PYTHON -m mpremote connect "$PUERTO" run {{config_root}}/firmware/esp32/main.py
+"""

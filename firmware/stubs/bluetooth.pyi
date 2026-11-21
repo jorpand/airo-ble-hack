@@ -23,7 +23,7 @@ class BLE:
     def irq(self, handler: Callable[[int, Any], None], /) -> None: ...
     def gap_scan(
         self,
-        duration_ms: int,
+        duration_ms: int | None = ...,
         interval_us: int = ...,
         window_us: int = ...,
         active: bool = ...,
@@ -33,7 +33,7 @@ class BLE:
         self,
         addr_type: int,
         addr: bytes,
-        scan_duration_ms: int = ...,
+        scan_duration_ms: int | None = ...,
         min_conn_interval_us: int | None = ...,
         max_conn_interval_us: int | None = ...,
         /,
@@ -48,13 +48,6 @@ class BLE:
     ) -> None: ...
     def gattc_exchange_mtu(self, conn_handle: int, /) -> None: ...
 
-_IRQ_SCAN_RESULT: int
-_IRQ_SCAN_DONE: int
-_IRQ_CENTRAL_CONNECT: int
-_IRQ_CENTRAL_DISCONNECT: int
-_IRQ_GATTC_SERVICE_RESULT: int
-_IRQ_GATTC_SERVICE_DONE: int
-_IRQ_GATTC_CHARACTERISTIC_RESULT: int
-_IRQ_GATTC_CHARACTERISTIC_DONE: int
-_IRQ_GATTC_WRITE_DONE: int
-_IRQ_MTU_EXCHANGED: int
+# OJO: MicroPython 1.26 **no** expone las constantes `_IRQ_*` en este modulo
+# (aparecen en versiones posteriores). El firmware usa los numeros de evento
+# de `extmod/modbluetooth.h`, definidos en `firmware/esp32/main.py`.

@@ -44,6 +44,26 @@ TIMEOUT_MS = 10000
 #: Cada cuanto se mira si ya ha pasado algo (milisegundos).
 PASO_MS = 50
 
+# --- Codigos de evento del IRQ ------------------------------------------------
+#
+# MicroPython 1.26 (la version de este firmware) **no expone** las constantes
+# `_IRQ_*` en el modulo `bluetooth`: hay que usar los numeros. Estos son los
+# de `extmod/modbluetooth.h`, que es donde estan definidos:
+#
+#     1 CENTRAL_CONNECT        2 CENTRAL_DISCONNECT
+#     5 SCAN_RESULT            6 SCAN_DONE
+#     9 GATTC_SERVICE_RESULT  10 GATTC_SERVICE_DONE
+#    11 GATTC_CHARACTERISTIC_RESULT  12 GATTC_CHARACTERISTIC_DONE
+#    17 GATTC_WRITE_DONE
+#
+IRQ_CENTRAL_CONNECT = 1
+IRQ_CENTRAL_DISCONNECT = 2
+IRQ_SCAN_RESULT = 5
+IRQ_SCAN_DONE = 6
+IRQ_GATTC_SERVICE_RESULT = 9
+IRQ_GATTC_CHARACTERISTIC_RESULT = 11
+IRQ_GATTC_WRITE_DONE = 17
+
 # --- Paquetes de prueba -------------------------------------------------------
 #
 # Calculados con `airo_ble/protocol.py` (la fuente de la verdad). No se
@@ -186,24 +206,27 @@ class ClienteAiro:
     # imprime nada, solo se guarda el estado. Lo que espera, espera fuera.
 
     def _irq(self, event, data):
-        if event == bluetooth._IRQ_SCAN_RESULT:
+        if event == IRQ_SCAN_RESULT:
             addr_type, addr, _adv_type, rssi, adv_data = data
-            self.vistos[addr] = (addr_type, nombre_de_adv(adv_data), rssi)
-        elif event == bluetooth._IRQ_CENTRAL_CONNECT:
+            # `addr` y `adv_data` llegan como memoryview: se copian a bytes
+            # (el memoryview no tiene `.decode` y la clave del diccionario
+            # tiene que sobrevivir al reusable buffer).
+            self.vistos[bytes(addr)] = (addr_type, nombre_de_adv(bytes(adv_data)), rssi)
+        elif event == IRQ_CENTRAL_CONNECT:
             self.conn = data[0]
-        elif event == bluetooth._IRQ_CENTRAL_DISCONNECT:
+        elif event == IRQ_CENTRAL_DISCONNECT:
             self.conn = -1
             self.servicio = (0, 0)
             self.caracteristica = 0
-        elif event == bluetooth._IRQ_GATTC_SERVICE_RESULT:
+        elif event == IRQ_GATTC_SERVICE_RESULT:
             uuid, inicio, fin = data
             if es_uuid(uuid, UUID_SERVICIO):
                 self.servicio = (inicio, fin)
-        elif event == bluetooth._IRQ_GATTC_CHARACTERISTIC_RESULT:
+        elif event == IRQ_GATTC_CHARACTERISTIC_RESULT:
             uuid, handle, _props = data
             if es_uuid(uuid, UUID_CHARACTERISTIC):
                 self.caracteristica = handle
-        elif event == bluetooth._IRQ_GATTC_WRITE_DONE:
+        elif event == IRQ_GATTC_WRITE_DONE:
             self.escrito = data[1]
 
     # -- Pasos -------------------------------------------------------------
@@ -213,27 +236,85 @@ class ClienteAiro:
 
         Devuelve un diccionario: direccion -> (tipo, nombre, rssi).
 
-        Ojo: `gap_scan` acepta sus argumentos **por posicion**
-        (duracion, intervalo, ventana, activo). El escaneo activo es el que
-        trae el nombre del dispositivo en la respuesta del scan.
+        Ojo con la API de MicroPython 1.26:
+
+        - `gap_scan(duracion, intervalo, ventana, activo)` arranca el escaneo.
+        - `gap_scan(None)` **lo para**. (Ojo: `gap_scan(0)` no lo para, sino
+          que deja el escaneo para siempre.)
+        - El escaneo se para antes de conectar: NimBLE no deja conectar con
+          un descubrimiento en marcha y devuelve `EALREADY`.
         """
         self.vistos = {}
         self.ble.gap_scan(ms, 1280000, 11250, True)
         _esperar(ms + 500)
+        self.ble.gap_scan(None)
+        _esperar(300)
         return self.vistos
 
-    def buscar_robot(self, ms=5000):
-        """Escanea hasta encontrar al robot por su nombre."""
-        vistos = self.escanear(ms)
-        for addr, (addr_type, nombre, rssi) in vistos.items():
+    def escanear_hasta(self, timeout_ms=30000, paso_ms=5000):
+        """Escanea en trozos, imprimiendo lo que va apareciendo.
+
+        Se para en cuanto aparece el robot por su nombre. Los trozos cortos
+        existen porque el robot no anuncia siempre: con un escaneo largo
+        se pierde lo que se vio al principio.
+        """
+        gastado = 0
+        self.vistos = {}
+        while gastado < timeout_ms:
+            self.vistos = {}
+            self.ble.gap_scan(paso_ms, 1280000, 11250, True)
+            _esperar(paso_ms + 500)
+            self.ble.gap_scan(None)
+            _esperar(300)
+            gastado += paso_ms + 800
+            for addr, (_tipo, nombre, rssi) in self.vistos.items():
+                print(f"   {_mac(addr)}  {nombre or '?'}  rssi={rssi}")
+            if any(nombre == NOMBRE_ROBOT for (_t, nombre, _r) in self.vistos.values()):
+                break
+        return self.vistos
+
+    def buscar_robot(self, timeout_ms=30000):
+        """Busca al robot y devuelve su direccion.
+
+        Primero por su nombre (`AIRo`). Si no aparece, se prueban los
+        candidatos uno a uno: se conecta con ellos y se mira si tienen el
+        servicio `FFF0`. Es lo que hace falta porque hay ESP32 que no
+        delivering el nombre en la respuesta de escaneo.
+        """
+        vistos = self.escanear_hasta(timeout_ms)
+        for addr, (addr_type, nombre, _rssi) in vistos.items():
             if nombre == NOMBRE_ROBOT:
-                return addr, addr_type, rssi
-        return None, None, None
+                return addr, addr_type
+        for addr, (addr_type, _nombre, _rssi) in vistos.items():
+            print(f"   probando {_mac(addr)} (a ver si tiene FFF0)...")
+            if self.sonda_servicio(addr, addr_type):
+                return addr, addr_type
+        return None, None
+
+    def sonda_servicio(self, addr, addr_type, timeout_ms=4000):
+        """Conecta con un candidato y mira si tiene el servicio FFF0."""
+        if not self.conectar(addr, addr_type, timeout_ms):
+            return False
+        self.servicio = (0, 0)
+        self.ble.gattc_discover_services(self.conn, bluetooth.UUID16(UUID_SERVICIO))
+        encontrado = _esperar_hasta(lambda: self.servicio != (0, 0), timeout_ms)
+        self.desconectar()
+        _esperar(300)
+        return encontrado
 
     def conectar(self, addr, addr_type=0, timeout_ms=TIMEOUT_MS):
-        """Conecta con el robot. Devuelve True si lo consigue."""
+        """Conecta con el robot. Devuelve True si lo consigue.
+
+        Se deja el `scan_duration_ms` por defecto (2 s de escaneo con lista
+        blanca): el chip ya sabe la direccion, asi que solo hace falta para
+        estar en el mismo momento que el robot.
+        """
         self.conn = -1
-        self.ble.gap_connect(addr_type, addr, 0)
+        try:
+            self.ble.gap_connect(addr_type, addr)
+        except OSError as exc:
+            self.error = f"no se pudo conectar ({exc})"
+            return False
         if _esperar_hasta(lambda: self.conn >= 0, timeout_ms):
             return True
         self.error = "no se pudo conectar"
@@ -291,18 +372,12 @@ def main():
     print("=== SPIKE: ESP32-S3 -> robot AIRO ===")
     cliente = ClienteAiro()
 
-    print("1. Escaneando 5 s...")
-    vistos = cliente.escanear(5000)
-    if not vistos:
-        print("   no se ha visto nada por BLE")
-        print("   ¿esta el robot encendido? ¿el BT del chip enganchado?")
-        return 1
-    for addr, (_addr_type, nombre, rssi) in vistos.items():
-        print(f"   {_mac(addr)}  {nombre or '?'}  rssi={rssi}")
-
-    addr, addr_type, _rssi = cliente.buscar_robot(5000)
+    print("1. Buscando al robot (hasta 30 s)...")
+    addr, addr_type = cliente.buscar_robot(30000)
     if addr is None or addr_type is None:
         print(f"   no aparece ningun dispositivo llamado {NOMBRE_ROBOT}")
+        print("   (ni uno con el servicio FFF0)")
+        print("   ¿esta el robot encendido y cerca?")
         return 1
     print(f"2. Conectando con {_mac(addr)} ({NOMBRE_ROBOT})...")
     if not cliente.conectar(addr, addr_type):

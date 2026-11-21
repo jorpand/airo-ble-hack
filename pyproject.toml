@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airo-ble"
+version = "1.0.0"
+description = "Cliente BLE del robot Clementoni AIRO (habla su idioma de 20 bytes)"
+readme = "GUIA-PROGRAMAR-AIRO.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "airo-ble" }]
+keywords = ["airo", "clementoni", "robot", "ble", "bluetooth"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Home Automation",
+]
+
+# La libreria en si solo solo necesita bleak: nada de web, nada de interfaz.
+dependencies = [
+    "bleak>=0.19",
+]
+
+[project.optional-dependencies]
+# La API web (FastAPI + Pydantic) es opcional.
+api = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.6",
+]
+# El puente para Scratch.
+scratch = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.6",
+]
+dev = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.6",
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "playwright>=1.40",
+    # El TestClient de FastAPI necesita un cliente HTTP. A partir de
+    # Python 3.11 se usa httpx2; antes, httpx.
+    "httpx>=0.27; python_version < '3.11'",
+    "httpx2>=2.0; python_version >= '3.11'",
+]
+
+[project.scripts]
+airo-console = "airo_ble.console:main"
+airo-server = "airo_ble.server:main"
+
+[project.urls]
+Homepage = "https://github.com/jorpand/airo-ble-hack"
+Repository = "https://github.com/jorpand/airo-ble-hack"
+Issues = "https://github.com/jorpand/airo-ble-hack/issues"
+Documentacion = "https://github.com/jorpand/airo-ble-hack/blob/main/GUIA-PROGRAMAR-AIRO.md"
+
+[tool.setuptools]
+packages = ["airo_ble", "airo_ble.api", "airo_ble.scratch3_airo"]
+
+[tool.setuptools.package-data]
+airo_ble = ["py.typed", "calibration.json"]
+"airo_ble.scratch3_airo" = ["*.js", "*.html", "*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Los avisos de deprecacion que salen de NUESTRO codigo son un error: asi
+# no se puede volver a usar algo que FastAPI (o bleak) ya no recomienda.
+# Los de terceros se quedan como aviso, para no depender de ellos.
+filterwarnings = [
+    "error::DeprecationWarning:airo_ble.*",
+    "error::PendingDeprecationWarning:airo_ble.*",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+# Carpetas que no son codigo nuestro (artefactos y material de reversing).
+extend-exclude = [
+    ".venv-3.14",
+    "web",
+    "evidencia",
+    "analisis",
+]
+
+# Solo se comprueban los errores que de verdad rompen el codigo (sintaxis y
+# nombres indefinidos). No se reformatea el repo: el estilo es el de siempre.
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]

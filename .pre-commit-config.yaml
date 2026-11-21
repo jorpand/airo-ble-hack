@@ -1,0 +1,54 @@
+# Hooks que se ejecutan antes de cada commit.
+#
+#     pip install pre-commit
+#     pre-commit install
+#
+# Y para pasarlos sobre todo el repo:
+#
+#     pre-commit run --all-files
+#
+# Los mismos checks se ejecutan en la CI (ver .github/workflows/ci.yml).
+
+exclude: '^(analisis/|evidencia/|web/node_modules/|web/dist/)'
+
+default_language_version:
+  python: python3
+
+repos:
+  # --- Chequeos genericos de formato e higiene ---------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+      - id: forbid-submodules
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  # --- Python -------------------------------------------------------------
+  # Solo se comprueban los errores que rompen el codigo (sintaxis, nombres
+  # indefinidos). No se reformatea: el estilo del repo no se toca aqui.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff
+        args: ["--select=E9,F63,F7,F82"]
+        files: \.py$
+        types: [python]
+
+  # --- Secretos -----------------------------------------------------------
+  # Corta el commit si alguien sube una clave, un token o una contrasena.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks

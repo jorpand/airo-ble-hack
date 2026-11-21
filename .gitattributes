@@ -1,0 +1,38 @@
+# Normalizacion de finales de linea: LF en el repo, LF en el checkout.
+* text=auto eol=lf
+
+# Marcar como binarios (Git no debe tocar su contenido)
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.jar   binary
+*.apk   binary
+*.dex   binary
+*.wasm  binary
+
+# Ficheros de texto que deben quedar sin conversion de fin de linea
+*.py    text diff=python
+*.js    text diff=javascript
+*.jsx   text diff=javascript
+*.ts    text diff=typescript
+*.tsx   text diff=typescript
+*.css   text diff=css
+*.html  text diff=html
+*.json  text
+*.md    text
+*.txt   text
+*.toml  text
+*.yml   text
+*.yaml  text
+*.asm   text
+*.tsv   text
+
+# Los volcados y diffs grandes se tratan como binario para no ralentizar git
+*.tsv   -diff
+*.asm   -diff

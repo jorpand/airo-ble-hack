@@ -1,0 +1,5 @@
+# Cliente BLE del Clementoni AIRO
+#
+# bleak >= 0.19 (probado con 3.0.2). En Linux hace falta soporte de BlueZ:
+#   sudo apt install python3-bleak bluez
+bleak>=0.19

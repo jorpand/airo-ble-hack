@@ -1,0 +1,129 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Entornos virtuales
+.venv/
+.venv*/
+venv/
+env/
+ENV/
+
+# Paquetes construidos
+build/
+dist/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# Cache de herramientas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.tox/
+.nox/
+.hypothesis/
+
+# Cobertura
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.cover
+nosetests.xml
+
+# Jupyter
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# ---------------------------------------------------------------------------
+# Node / frontend (web/)
+# ---------------------------------------------------------------------------
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# La build de Vite no se versiona: se regenera con `npm run build`.
+# La API FastAPI la sirve desde web/dist, asi que hay que compilarla
+# antes de arrancar el backend (ver README).
+web/dist/
+web/.vite/
+web/.vitest-cache/
+web/coverage/
+
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Secretos y configuracion local
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# ---------------------------------------------------------------------------
+# Datos locales del robot (calibracion y programas guardados)
+# ---------------------------------------------------------------------------
+*.airo
+guardado.json
+calibration.local.json
+
+# ---------------------------------------------------------------------------
+# Artefactos propios del proyecto
+# ---------------------------------------------------------------------------
+# Volcados generados del desensamblado del APK: pesan ~19 MB y se
+# regeneran con los scripts de analisis/. Solo se versiona el codigo.
+analisis/*.txt
+analisis/*.tsv
+analisis/*.bin
+analisis/*.dex
+
+# Evidencia del reversing y capturas: material de trabajo, no fuente.
+evidencia/
+
+# Bases de datos y ficheros generados en general
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# ---------------------------------------------------------------------------
+# Editores y SO
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.ropeproject/
+.spyderproject/
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AIRO - prueba del servidor</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 46rem; }
+  h1 { font-size: 1.4rem; }
+  button { font-size: 1rem; padding: .5rem .9rem; margin: .2rem; border-radius: .4rem;
+           border: 1px solid #bbb; background: #f5f5f5; cursor: pointer; }
+  button:hover { background: #e8e8e8; }
+  pre { background: #111; color: #9f9; padding: .8rem; border-radius: .4rem; overflow: auto; }
+  .fila { margin: .6rem 0; }
+  #estado { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>AIRO &mdash; prueba del servidor local</h1>
+<p id="estado">consultando...</p>
+
+<div class="fila">
+  <button onclick="mover('move',{left:2,right:2})">adelante</button>
+  <button onclick="mover('move',{left:-2,right:-2})">atras</button>
+  <button onclick="mover('move',{left:2,right:-2})">izquierda</button>
+  <button onclick="mover('move',{left:-2,right:2})">derecha</button>
+  <button onclick="mover('stop',{})">parar</button>
+</div>
+
+<div class="fila">
+  <button onclick="mover('led',{mode:'on'})">luz on</button>
+  <button onclick="mover('led',{mode:'flash'})">luz flash</button>
+  <button onclick="mover('led',{mode:'fade'})">luz fade</button>
+  <button onclick="mover('led',{mode:'off'})">luz off</button>
+</div>
+
+<div class="fila">
+  <button onclick="mover('arm',{side:'izquierdo',pose:'arriba'})">brazo izq arriba</button>
+  <button onclick="mover('arm',{side:'derecho',pose:'arriba'})">brazo der arriba</button>
+  <button onclick="mover('arm',{side:'izquierdo',pose:'medio'})">brazo izq medio</button>
+  <button onclick="mover('arm',{side:'derecho',pose:'medio'})">brazo der medio</button>
+  <button onclick="mover('kata',{})">kata</button>
+  <button onclick="mover('reset',{})">reset</button>
+</div>
+
+<pre id="salida"></pre>
+
+<script>
+const API = 'http://localhost:8765';
+
+async function mover(tipo, extra) {
+  const cmd = Object.assign({type: tipo}, extra);
+  const r = await fetch(API + '/api/command', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(cmd)
+  });
+  const datos = await r.json();
+  document.getElementById('salida').textContent =
+    JSON.stringify(datos, null, 2);
+  actualizar();
+}
+
+async function actualizar() {
+  try {
+    const r = await fetch(API + '/api/status');
+    const s = await r.json();
+    document.getElementById('estado').textContent = s.conectado
+      ? 'Robot conectado | luz: ' + s.led + ' | ruedas: ' + s.izquierda + ' / ' + s.derecha
+      : 'Sin conexion con el robot';
+  } catch (e) {
+    document.getElementById('estado').textContent =
+      'El servidor no responde. ¿Has arrancado "python3 airo_server.py"?';
+  }
+}
+
+actualizar();
+setInterval(actualizar, 2000);
+</script>
+</body>
+</html>

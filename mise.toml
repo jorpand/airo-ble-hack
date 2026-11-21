@@ -121,3 +121,23 @@ if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"
 echo "Puerto: $PUERTO"
 $AIRO_PYTHON -m mpremote connect "$PUERTO" run {{config_root}}/firmware/esp32/main.py
 """
+
+[tasks.firmware-wifi]
+description = "Copia las credenciales de la WiFi a la placa y se conecta"
+#: Las credenciales estan en firmware/esp32/wifi.json, que NO se versiona
+#: (copia wifi.example.json y pon tus datos). Se copian a la placa y se
+#: comprueba la conexion.
+run = """
+PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
+if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
+CONFIG={{config_root}}/firmware/esp32/wifi.json
+if [ ! -f "$CONFIG" ]; then
+    echo "Falta $CONFIG"
+    echo "Copia el ejemplo y pon tus datos:"
+    echo "    cp {{config_root}}/firmware/esp32/wifi.example.json $CONFIG"
+    exit 1
+fi
+$AIRO_PYTHON -m mpremote connect "$PUERTO" fs cp "$CONFIG" :wifi.json
+$AIRO_PYTHON -m mpremote connect "$PUERTO" fs cp {{config_root}}/firmware/esp32/wifi.py :wifi.py
+$AIRO_PYTHON -m mpremote connect "$PUERTO" exec "import wifi; wifi.conectar()"
+"""

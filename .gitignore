@@ -81,6 +81,11 @@ pnpm-debug.log*
 secrets.json
 credentials.json
 
+# Las credenciales de la WiFi del ESP32-S3. Van en un fichero local que se
+# copia a la placa: no se versionan (copia `wifi.example.json` y renombralo).
+firmware/esp32/wifi.json
+firmware/esp32/*.local.json
+
 # ---------------------------------------------------------------------------
 # Datos locales del robot (calibracion y programas guardados)
 # ---------------------------------------------------------------------------

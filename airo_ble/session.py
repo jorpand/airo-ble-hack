@@ -471,6 +471,9 @@ class RobotSession:
         cmd = self.robot.command
         return {
             "conectado": bool(self.conectado and self.robot.is_connected),
+            # Si se habla con el robot a traves del puente del ESP32-S3, se
+            # dice cual es: asi se sabe de un vistazo por donde van las cosas.
+            "puente": self.robot.url if isinstance(self.robot, BridgeRobot) else None,
             "accion": self.accion_actual,
             "error": self.error,
             "luz": cmd.led.name.lower(),

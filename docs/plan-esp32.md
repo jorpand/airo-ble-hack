@@ -276,12 +276,18 @@ placa real). Falta lo mismo que en la Fase 0: verlo mover al robot.
   coherente.
 - `firmware/esp32/README.md`: flasheo, particiones, IP, mDNS, credenciales.
 
-**Estado**: las tareas de mise están; falta el job de CI propio del firmware
-(aunque `ruff` y `pyright` ya lo cubren, porque `firmware/` está en la
-configuración). El mDNS lo trae el propio port del ESP32 (el nombre se pone
-antes de activar la interfaz, que es cuando se inicializa el responder), pero
-**no se ha podido comprobar**: en la red de pruebas el tráfico mDNS entero no
-pasaba, así que el camino que funciona es la IP.
+**Estado**: las tareas de mise están (`firmware-flash`, `firmware-run`,
+`firmware-wifi`, `firmware-logs`). La CI no necesita un job aparte: `ruff` y
+`pyright` ya miran `firmware/` (está en la configuración), los tests del
+firmware van en la suite normal, y `tests/test_firmware_coherencia.py`
+comprueba que la versión de MicroPython sea la misma en `mip.json`, en
+`mise.toml` y en el README, que todo módulo de la placa tenga su stub y que
+los ficheros no se desvían del ASCII.
+
+El mDNS lo trae el propio port del ESP32 (el nombre se pone antes de activar
+la interfaz, que es cuando se inicializa el responder), pero **no se ha podido
+comprobar**: en la red de pruebas el tráfico mDNS entero no pasaba, así que el
+camino que funciona es la IP.
 
 **Criterio de salida**: clonar el repo en otra máquina y flashear con un comando.
 

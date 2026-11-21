@@ -87,11 +87,13 @@ escritura real de los 20 bytes**: el robot estaba apagado (su módulo HM-10 solo
 se anuncia unos segundos tras encenderlo) y no se ha podido comprobar que se
 mueve.
 
-También falta: un job de CI propio del firmware (aunque `ruff` y `pyright`
-ya lo cubren, porque `firmware/` está en la configuración) y comprobar el
-mDNS: el port del ESP32 ya lo trae (el nombre se pone antes de activar la
-interfaz), pero en la red de pruebas el tráfico mDNS entero no pasaba, así que
-el camino que funciona es la IP.
+También falta comprobar el mDNS: el port del ESP32 ya lo trae (el nombre se
+pone antes de activar la interfaz), pero en la red de pruebas el tráfico mDNS
+entero no pasaba, así que el camino que funciona es la IP. Y un job de CI
+propio del firmware: no hace falta, porque `ruff` y `pyright` ya miran
+`firmware/`, los tests del firmware van en la suite normal y
+`tests/test_firmware_coherencia.py` vigila que la versión de MicroPython sea
+la misma en `mip.json`, en `mise.toml` y en el README.
 
 ---
 

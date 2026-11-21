@@ -245,6 +245,9 @@ class PeticionMover(BaseModel):
 
 class Estado(BaseModel):
     conectado: bool
+    #: Si se habla con el robot a traves del puente del ESP32-S3, la URL del
+    #: puente. None = se habla por Bluetooth directamente.
+    puente: str | None = None
     accion: str | None = None
     error: str | None = None
     luz: str = "off"

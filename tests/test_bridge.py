@@ -373,7 +373,10 @@ async def test_la_sesion_habla_con_el_puente(
     assert isinstance(sesion.robot, BridgeRobot)
     await sesion.conectar()
     try:
-        assert sesion.estado()["conectado"] is True
+        estado = sesion.estado()
+        assert estado["conectado"] is True
+        # el estado dice por donde se habla con el robot
+        assert estado["puente"] == url
     finally:
         await sesion.desconectar()
 

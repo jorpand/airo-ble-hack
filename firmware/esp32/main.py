@@ -154,13 +154,20 @@ def nombre_de_adv(adv_data):
 def es_uuid(uuid, corto):
     """True si `uuid` es el UUID de 16 bits `corto` (en cualquiera de sus formas).
 
-    El stack puede devolver el UUID de 16 bits o el de 128 bits (con el base
-    del robot, que es el que cambia). Comparamos solo la parte corta, que es
-    la misma en los dos casos.
+    MicroPython 1.26 imprime los UUID como `UUID(0xfff0)` (16 bits) o como
+    `UUID('0000fff0-0000-1000-8000-00805f9b34fb')` (128 bits). El base UUID
+    del robot puede ser uno u otro (ver `docs/protocolo.md`), asi que se
+    compara la parte corta, que es la misma en los dos casos.
+
+    Se usa el buffer del UUID (no su forma escrita) porque en la version de
+    128 bits el grupo de 16 bits va en las posiciones 12 y 13 (little endian).
     """
-    texto = str(uuid).lower().replace("-", "")
-    corto_hex = f"{corto:04x}"
-    return texto.startswith("0000" + corto_hex) or texto.startswith(corto_hex)
+    datos = bytes(uuid)
+    if len(datos) == 2:
+        return (datos[0] | (datos[1] << 8)) == corto
+    if len(datos) >= 14:
+        return (datos[12] | (datos[13] << 8)) == corto
+    return False
 
 
 def _mac(addr):
@@ -296,7 +303,7 @@ class ClienteAiro:
         if not self.conectar(addr, addr_type, timeout_ms):
             return False
         self.servicio = (0, 0)
-        self.ble.gattc_discover_services(self.conn, bluetooth.UUID16(UUID_SERVICIO))
+        self.ble.gattc_discover_services(self.conn, bluetooth.UUID(UUID_SERVICIO))
         encontrado = _esperar_hasta(lambda: self.servicio != (0, 0), timeout_ms)
         self.desconectar()
         _esperar(300)
@@ -329,14 +336,14 @@ class ClienteAiro:
 
         self.servicio = (0, 0)
         self.caracteristica = 0
-        self.ble.gattc_discover_services(conn, bluetooth.UUID16(UUID_SERVICIO))
+        self.ble.gattc_discover_services(conn, bluetooth.UUID(UUID_SERVICIO))
         if not _esperar_hasta(lambda: self.servicio != (0, 0), timeout_ms):
             self.error = "no se encontro el servicio FFF0"
             return False
 
         inicio, fin = self.servicio
         self.ble.gattc_discover_characteristics(
-            conn, inicio, fin, bluetooth.UUID16(UUID_CHARACTERISTIC)
+            conn, inicio, fin, bluetooth.UUID(UUID_CHARACTERISTIC)
         )
         if not _esperar_hasta(lambda: self.caracteristica != 0, timeout_ms):
             self.error = "no se encontro la characteristic FFF1"

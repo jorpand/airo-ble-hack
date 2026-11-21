@@ -50,6 +50,26 @@ def _cargar_firmware() -> Any:
     return modulo
 
 
+class UUIDFalso:
+    """Imita el UUID de MicroPython: 2 bytes (16 bits) o 16 bytes (128 bits).
+
+    MicroPython 1.26 no tiene `UUID16` (se hace `UUID(0xFFF0)`) y guarda los
+    128 bits en little endian, con el grupo de 16 bits en las posiciones 12 y
+    13. Esto es lo que se ha visto en la placa de verdad.
+    """
+
+    def __init__(self, valor: int | str) -> None:
+        if isinstance(valor, int):
+            self.datos = bytes([valor & 0xFF, (valor >> 8) & 0xFF])
+        else:
+            # El little endian del Bluetooth es el byte a byte del canonico
+            # dado la vuelta: 0000fff0-...-00805f9b34fb -> fb349b5f...f0ff0000
+            self.datos = bytes.fromhex(valor.replace("-", ""))[::-1]
+
+    def __bytes__(self) -> bytes:
+        return self.datos
+
+
 @pytest.fixture(scope="module")
 def firmware() -> Any:
     return _cargar_firmware()
@@ -112,22 +132,26 @@ def test_nombre_de_adv_sin_nombre(firmware: Any) -> None:
 
 
 def test_es_uuid_con_16_bits(firmware: Any) -> None:
-    assert firmware.es_uuid("0000fff0-0000-1000-8000-00805f9b34fb", 0xFFF0)
+    """MicroPython 1.26 guarda el UUID de 16 bits como dos bytes."""
+    assert firmware.es_uuid(UUIDFalso(0xFFF0), 0xFFF0)
+    assert not firmware.es_uuid(UUIDFalso(0xFFF0), 0xFFF1)
 
 
 def test_es_uuid_con_128_bits_y_base_estandar(firmware: Any) -> None:
     """El base UUID que usa el robot normalmente."""
-    assert firmware.es_uuid("0000fff1-0000-1000-8000-00805f9b34fb", 0xFFF1)
+    uuid = UUIDFalso("0000fff1-0000-1000-8000-00805f9b34fb")
+    assert firmware.es_uuid(uuid, 0xFFF1)
 
 
 def test_es_uuid_con_128_bits_y_base_de_ceros(firmware: Any) -> None:
     """El otro base UUID: el del modulo cuando se reinicia de otra manera."""
-    assert firmware.es_uuid("0000fff1-0000-1000-8000-000000000000", 0xFFF1)
+    uuid = UUIDFalso("0000fff1-0000-1000-8000-000000000000")
+    assert firmware.es_uuid(uuid, 0xFFF1)
 
 
 def test_es_uuid_no_confunde_otros_servicios(firmware: Any) -> None:
-    assert not firmware.es_uuid("0000fff2-0000-1000-8000-00805f9b34fb", 0xFFF1)
-    assert not firmware.es_uuid("0000180f-0000-1000-8000-00805f9b34fb", 0xFFF1)
+    assert not firmware.es_uuid(UUIDFalso(0xFFF2), 0xFFF1)
+    assert not firmware.es_uuid(UUIDFalso("0000180f-0000-1000-8000-00805f9b34fb"), 0xFFF1)
 
 
 # --- Varios ---------------------------------------------------------------------
@@ -135,6 +159,18 @@ def test_es_uuid_no_confunde_otros_servicios(firmware: Any) -> None:
 
 def test_mac_se_formatea(firmware: Any) -> None:
     assert firmware._mac(b"\xaa\xbb\xcc\xdd\xee\xff") == "AA:BB:CC:DD:EE:FF"
+
+
+def test_el_firmware_no_usa_uuid16() -> None:
+    """MicroPython 1.26 no tiene `UUID16`: el UUID de 16 bits es `UUID(0x...)`."""
+    fuente = RUTA_FIRMWARE.read_text(encoding="utf-8")
+    assert "UUID16" not in fuente
+
+
+def test_el_firmware_no_usa_las_constantes_irq() -> None:
+    """En 1.26 las constantes `_IRQ_*` no existen: los eventos van numerados."""
+    fuente = RUTA_FIRMWARE.read_text(encoding="utf-8")
+    assert "bluetooth._IRQ_" not in fuente
 
 
 def test_esperar_hasta_devuelve_true_si_se_cumple(firmware: Any) -> None:

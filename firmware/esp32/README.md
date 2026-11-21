@@ -45,6 +45,12 @@ python -m esptool --chip esp32s3 --port /dev/ttyUSB0 erase_flash
 En el repo hay tareas de mise para todo esto: `mise run firmware-flash`,
 `mise run firmware-run` y `mise run firmware-wifi`.
 
+Y para ver lo que dice la placa (la reinicia y saca el log de arranque):
+
+```bash
+mise run firmware-logs
+```
+
 ## Los ficheros
 
 | Fichero | Qué hace |

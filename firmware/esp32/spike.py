@@ -91,7 +91,7 @@ async def main():
     if addr is None or addr_type is None:
         print(f"   no aparece ningun dispositivo llamado {ble_robot.NOMBRE_ROBOT}")
         print("   (ni uno con el servicio FFF0)")
-        print("   ¿esta el robot encendido y cerca?")
+        print("   esta el robot encendido y cerca?")
         return 1
     print(f"2. Conectando con {ble_robot.mac(addr)} ({ble_robot.NOMBRE_ROBOT})...")
     if not await cliente.conectar(addr, addr_type, 25000, 20000):

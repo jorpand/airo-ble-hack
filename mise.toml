@@ -137,6 +137,17 @@ echo "Puerto: $PUERTO"
 $AIRO_PYTHON -m mpremote connect "$PUERTO" run {{config_root}}/firmware/esp32/main.py
 """
 
+[tasks.firmware-logs]
+description = "Muestra en el terminal lo que dice la placa por el puerto serie"
+#: Con el USB nativo, abrir el puerto no reinicia la placa, asi que se
+#: reinicia a proposito (secuencia DTR/RTS) para ver el log de arranque.
+run = """
+PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
+if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
+echo "Puerto: $PUERTO"
+$AIRO_PYTHON {{config_root}}/tools/firmware/logs.py --port "$PUERTO" --reset
+"""
+
 [tasks.firmware-wifi]
 description = "Copia las credenciales de la WiFi a la placa y se conecta"
 #: Las credenciales estan en firmware/esp32/wifi.json, que NO se versiona

@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 from _firmware import cargar
 
+from airo_ble.api.service import RobotService
 from airo_ble.bridge import PUENTE_ENV, BridgeRobot, crear_robot, url_del_puente
 from airo_ble.client import (
     AiroConnectionError,
@@ -338,3 +339,64 @@ async def test_la_placa_reenvia_el_paquete() -> None:
     # el refresco ha mandando el mismo paquete mas de una vez
     assert len(cliente.ble.escrituras) > 1
     assert all(e[2] == b"\xa5\x01" for e in cliente.ble.escrituras)
+
+
+# --- La cadena entera: sesion y API -> puente -> placa -------------------------
+
+
+async def test_la_sesion_habla_con_el_puente(
+    puente: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La sesion (lo que usa la API web) habla con el puente, no con el BLE."""
+    url, cliente = puente
+    monkeypatch.setenv(PUENTE_ENV, url)
+
+    sesion = RobotSession()
+    assert isinstance(sesion.robot, BridgeRobot)
+    await sesion.conectar()
+    try:
+        assert sesion.estado()["conectado"] is True
+    finally:
+        await sesion.desconectar()
+
+
+async def test_mover_llega_al_robot_como_20_bytes(
+    puente: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un "avanzar" de la sesion llega a la placa como un paquete de 20 bytes.
+
+    Es la cadena completa: la sesion construye el comando, el puente lo
+    serializa y lo manda, y la placa lo escribe en el robot.
+    """
+    url, cliente = puente
+    monkeypatch.setenv(PUENTE_ENV, url)
+
+    sesion = RobotSession()
+    await sesion.conectar()
+    try:
+        await sesion.mover(izquierda=1.0, derecha=1.0)
+        await asyncio.sleep(0.2)
+    finally:
+        await sesion.desconectar()
+
+    assert cliente.recibidos, "no llego ningun paquete"
+    # el paquete de avanzar: el de la rueda izquierda es [2]=1 y [3]=1
+    assert len(cliente.recibidos[0]) == 20
+    assert cliente.recibidos[0][:2] == b"\xa5\x00"
+
+
+async def test_la_api_habla_con_el_puente(
+    puente: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La API web (que es lo que ve el niño) va al puente si lo hay."""
+    url, cliente = puente
+    monkeypatch.setenv(PUENTE_ENV, url)
+
+    servicio = RobotService()
+    await servicio.conectar()
+    try:
+        estado = servicio.estado()
+        assert estado["conectado"] is True
+        assert estado["luz"] == "off"
+    finally:
+        await servicio.desconectar()

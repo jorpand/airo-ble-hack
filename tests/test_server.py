@@ -10,13 +10,9 @@ Ejecutar: python3 tests/test_server.py
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.server import AiroService  # noqa: E402
-from airo_ble.protocol import Joint, Led  # noqa: E402
+from airo_ble.server import AiroService
+from airo_ble.protocol import Joint, Led
 
 
 async def escenario() -> None:

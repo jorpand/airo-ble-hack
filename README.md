@@ -9,7 +9,7 @@ Control del robot **Clementoni AIRO** por Bluetooth Low Energy, con:
 - 🧩 un **plugin de Scratch**.
 
 El análisis del protocolo (qué significa cada byte) está en
-[`GUIA-PROGRAMAR-AIRO.md`](GUIA-PROGRAMAR-AIRO.md).
+[`docs/protocolo.md`](docs/protocolo.md).
 
 ---
 
@@ -17,8 +17,13 @@ El análisis del protocolo (qué significa cada byte) está en
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e .            # la libreria
-pip install -e ".[api]"     # + la API web (FastAPI)
+pip install -e ".[dev]"     # la libreria + la API + los tests
+```
+
+O, si tienes `make`:
+
+```bash
+make install               # crea el venv e instala todo
 ```
 
 En Linux hace falta soporte de BlueZ: `sudo apt install python3-bleak bluez`.
@@ -58,7 +63,7 @@ otro proyecto o en un servidor sin llevar la interfaz encima.
 ## La consola
 
 ```bash
-python3 airo_console.py
+python3 -m airo_ble.console
 ```
 
 ```
@@ -143,7 +148,7 @@ El API de esto:
 ## Plugin de Scratch
 
 ```bash
-python3 airo_server.py      # http://localhost:8765
+python3 -m airo_ble.server      # http://localhost:8765
 ```
 
 La extensión (`airo_ble/scratch3_airo/airo.js`) se carga en TurboWarp como
@@ -155,10 +160,11 @@ La extensión (`airo_ble/scratch3_airo/airo.js`) se carga en TurboWarp como
 ```
 airo/
 ├── airo_ble/            # LA LIBRERIA (todo lo instalable vive aqui)
-│   ├── protocol.py      # el protocolo de 20 bytes
+│   ├── protocol.py      # el protocolo de 20 bytes (LA fuente de la verdad)
 │   ├── client.py        # cliente BLE
 │   ├── session.py       # conexión + ejecución de programas
-│   ├── console.py       # la consola
+│   ├── console.py       # la consola interactiva
+│   ├── commands.py      # la CLI de una vez (scan, drive, pose, led)
 │   ├── arms.py          # las poses de los brazos y qué lado se mueve
 │   ├── server.py        # servidor para el plugin de Scratch
 │   ├── api/             # backend FastAPI + Pydantic
@@ -169,13 +175,17 @@ airo/
 │   └── calibration.json # calibración por defecto de los brazos
 ├── web/                 # interfaz React (Vite)
 │   └── src/             # el código de la interfaz
-├── airo_console.py      # atajo a la consola
-├── airo_server.py       # atajo al servidor de Scratch
 ├── tests/               # tests del protocolo, la consola y el servidor
-├── analisis/            # scripts del desensamblado del APK
-├── example/             # ejemplos sueltos
-├── GUIA-PROGRAMAR-AIRO.md
-└── PLAN-MEJORAS.md
+├── docs/
+│   ├── protocolo.md     # la guia del protocolo (qué significa cada byte)
+│   ├── plan-mejoras.md  # el log de trabajo (histórico)
+│   └── desensamblado/   # los .asm que prueban cada byte
+├── tools/
+│   ├── gen_servos.py    # genera web/src/servos.js desde protocol.py
+│   ├── rev/             # scripts de ingeniería inversa
+│   └── hardware/        # scripts de medición con el robot
+├── Makefile             # install · test · web · run · lint
+└── pyproject.toml       # las dependencias y los scripts de consola
 ```
 
 Todo lo que se instala (`pip install .`) está dentro de `airo_ble/`, así que
@@ -184,16 +194,33 @@ guardes con `calib guardar` va a
 `~/.config/airo-ble/calibration.json` (la que viene con el paquete es solo
 el valor por defecto).
 
+### Una sola fuente de la verdad
+
+Los números del protocolo (el byte de cada servo, su signo, sus límites y el
+escalado de 8,5 grados) están **una sola vez**, en `airo_ble/protocol.py`.
+De ahí se genera `web/src/servos.js` con `tools/gen_servos.py`, así que la
+web y la librería no pueden desincronizarse. El test
+`tests/test_web_angulos.py` lo comprueba byte a byte.
+
+Antes los dos estaban escritos a mano y se separaron: la web usaba una
+fórmula fija que se equivocaba en hasta 230 grados en los codos.
+
 ### Qué no está en el repo
 
-- `web/dist/`: la build de Vite. Se regenera con `npm run build`.
-- `evidencia/`: el desensamblado y las capturas. Material de trabajo; lo que
-  prueba cada byte está en [`GUIA-PROGRAMAR-AIRO.md`](GUIA-PROGRAMAR-AIRO.md).
-- `analisis/*.txt` y `analisis/*.tsv`: los volcados generados del APK
+- `web/dist/`: la build de Vite. Se regenera con `make web`.
+- `tools/rev/*.txt` y `tools/rev/*.tsv`: los volcados generados del APK
   (~19 MB). Los scripts que los producen sí están.
+- `evidencia/`: las capturas y el material de trabajo del reversing. El
+  desensamblado que **sí** se publica está en [`docs/desensamblado/`](docs/desensamblado/).
 - Entornos virtuales, `node_modules/` y caches de herramientas.
 
 ## Tests
+
+```bash
+make test                # pytest + vitest
+```
+
+O por separado:
 
 ```bash
 pytest -q                # toda la suite de Python
@@ -212,16 +239,33 @@ python3 tests/test_server.py     # el servidor
 ## Desarrollo
 
 ```bash
+make help                   # la lista de todo lo que se puede hacer
+```
+
+| Comando | Qué hace |
+|---|---|
+| `make install` | crea el venv e instala la librería con los extras de desarrollo |
+| `make test` | `pytest` + `vitest` |
+| `make web` | compila la interfaz (`npm ci` + `npm run build`) |
+| `make web-dev` | arranca Vite en el 5173 (para tocar la interfaz) |
+| `make run` | arranca la API web en el 8100 |
+| `make console` | la consola interactiva |
+| `make lint` | `ruff` + los hooks de pre-commit |
+| `make servos` | regenera `web/src/servos.js` desde `protocol.py` |
+
+Los hooks de pre-commit revisan formato, sintaxis (ruff), ficheros grandes,
+conflictos de merge y **secretos** (gitleaks). La CI de GitHub Actions corre
+lo mismo: `pytest`, `npm test` y `pre-commit` en cada push y en cada PR.
+
+Para instalar los hooks:
+
+```bash
 pip install pre-commit
 pre-commit install            # se ejecuta antes de cada commit
 pre-commit run --all-files    # o sobre todo el repo
 ```
 
-Los hooks revisan formato, sintaxis (ruff), ficheros grandes, conflictos de
-merge y **secretos** (gitleaks). La CI de GitHub Actions corre lo mismo:
-`pytest`, `npm test` y `pre-commit` en cada push y en cada PR.
-
-Paraplica, mira [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Para colaborar, mira [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Cosas que conviene saber
 

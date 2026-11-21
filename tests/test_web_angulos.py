@@ -1,23 +1,22 @@
 """
 El mapeo de angulos de la web tiene que ser **el mismo** que el de la libreria.
 
-La web dibuja el robot en `web/src/angulos.js`, que es un espejo de
-`airo_ble/protocol.py`. Si los dos se separan, la interfaz enseña una pose que
-el robot no esta haciendo: antes de este modulo la web usaba una formula fija
+La web usa `web/src/servos.js`, que esta **generado** desde
+`airo_ble/protocol.py` por `tools/gen_servos.py`. Antes ese fichero estaba
+escrito a mano y las dos copias se separaron: la web usaba una formula fija
 (`((byte - 20) / 20) * 60`) para las cuatro articulaciones, con errores de
 hasta 230 grados en los codos.
 
-Estos testscontrastan las dos implementaciones articulation por articulation y
-angulo por angulo:
+Estos tests miran las dos caras del problema:
 
-  - el byte que calcula el JS tiene que ser **exactamente** el que calcula
-    `encode_servo()`,
-  - al deshacer ese byte, el angulo del JS tiene que ser el de Python (con el
-    error propio del byte, que son 8,5 grados),
-  - el estado que manda la API tiene que llevar el "cero" (neutral) de cada
-    articulacion, que es lo que necesita el JS para deshacer el escalado.
+  - **que el fichero generado esta al dia**: si alguien cambia `protocol.py`
+    y no regenera, este test falla (no hace falta node para verlo),
+  - **que el JS y la libreria dicen lo mismo**: byte a byte, para los cuatro
+    brazos y todo su rango mecanico,
+  - **que el estado que manda la API lleva el "cero" (neutral) de cada
+    articulacion**, que es lo que necesita el JS para deshacer el escalado.
 
-Si no hay `node` instalado, los tests se saltan (no se pueden ejecutar).
+Los dos ultimos necesitan `node`; si no esta instalado, se saltan.
 """
 
 from __future__ import annotations
@@ -30,39 +29,49 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.console import CALIBRATION_DEFAULT  # noqa: E402
-from airo_ble.protocol import (  # noqa: E402
+from airo_ble.console import CALIBRATION_DEFAULT
+from airo_ble.protocol import (
     SERVO_CENTER,
     SERVO_SCALE,
     Joint,
     encode_servo,
 )
-from airo_ble.session import RobotSession  # noqa: E402
+from airo_ble.session import RobotSession
 
 RAIZ = Path(__file__).resolve().parent.parent
-MODULO_JS = RAIZ / "web" / "src" / "angulos.js"
+MODULO_JS = RAIZ / "web" / "src" / "servos.js"
+GENERADOR = RAIZ / "tools" / "gen_servos.py"
+
+
+def _node() -> str | None:
+    """Ruta del `node`, o None si no hay (los tests se saltan entonces)."""
+    return shutil.which("node")
+
 
 #: Un byte son 8,5 grados: al deshacer el escalado no se puede saber mas.
 MEDIO_BYTE = SERVO_SCALE / 2
 
 
-def _node() -> str | None:
-    """Ruta del `node`, o None si no hay (los tests se saltan entonces)."""
-    node = shutil.which("node")
-    if node:
-        return node
-    for candidato in ("/home/jordi/.local/bin/node", "/usr/local/bin/node"):
-        if Path(candidato).exists():
-            return candidato
-    return None
+def test_el_fichero_generado_esta_al_dia() -> None:
+    """`web/src/servos.js` tiene que estar generado desde `protocol.py`.
 
-
-pytestmark = pytest.mark.skipif(
-    _node() is None or not MODULO_JS.exists(),
-    reason="hace falta node y el modulo web/src/angulos.js",
-)
+    Este es el test que evita que las dos implementaciones se separen otra
+    vez: si se toca `protocol.py` y no se regenera el JS, aqui falla.
+    """
+    assert MODULO_JS.exists(), (
+        f"falta {MODULO_JS}: se genera con `python3 tools/gen_servos.py`"
+    )
+    resultado = subprocess.run(
+        [sys.executable, str(GENERADOR), "--check"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert resultado.returncode == 0, (
+        "web/src/servos.js esta desactualizado:\n"
+        f"{resultado.stdout}{resultado.stderr}\n"
+        "  regenera con: python3 tools/gen_servos.py"
+    )
 
 
 def _neutrals() -> dict[str, int]:
@@ -135,6 +144,7 @@ console.log(JSON.stringify(salida));
     return json.loads(salida.stdout)
 
 
+@pytest.mark.skipif(_node() is None, reason="hace falta node")
 def test_el_js_calcula_el_mismo_byte_que_la_libreria(tmp_path: Path) -> None:
     """Byte a byte, para los cuatro brazos y todo su rango mecanico."""
     neutral = _neutrals()
@@ -151,6 +161,7 @@ def test_el_js_calcula_el_mismo_byte_que_la_libreria(tmp_path: Path) -> None:
             )
 
 
+@pytest.mark.skipif(_node() is None, reason="hace falta node")
 def test_el_js_deduce_el_mismo_angulo_que_la_libreria(tmp_path: Path) -> None:
     """Deshaciendo el byte, los dos dan el mismo angulo (con +-4,25 grados)."""
     neutral = _neutrals()
@@ -167,6 +178,31 @@ def test_el_js_deduce_el_mismo_angulo_que_la_libreria(tmp_path: Path) -> None:
                 f"{nombre}: del byte {byte_js} el JS deduce {angulo_js} "
                 f"y deberia ser {angulo} (+-{MEDIO_BYTE})"
             )
+
+
+@pytest.mark.skipif(_node() is None, reason="hace falta node")
+def test_el_js_redondea_como_la_libreria(tmp_path: Path) -> None:
+    """El JS usa el redondeo a la par (banker's) de .NET, como Python.
+
+    En los empates, Python va al par mas cercano y `Math.round` de JavaScript
+    siempre hacia arriba: con un byte de diferencia la web dibujaria una pose
+    que el robot no tiene.
+    """
+    script = tmp_path / "redondeo.mjs"
+    script.write_text(
+        f"""
+import {{ roundHalfEven }} from 'file://{MODULO_JS}';
+console.log(JSON.stringify([0.5, 1.5, 2.5, 3.5, 20.5, 21.5].map(roundHalfEven)));
+"""
+    )
+    salida = subprocess.run(
+        [_node(), str(script)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+    assert json.loads(salida.stdout) == [0, 2, 2, 4, 20, 22]
 
 
 def test_el_estado_manda_el_cero_de_cada_articulacion() -> None:

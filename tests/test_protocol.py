@@ -10,12 +10,7 @@ Ejecutar:  python3 tests/test_protocol.py      (o pytest)
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.protocol import (  # noqa: E402
+from airo_ble.protocol import (
     FIXED_TAIL,
     IDX_LEFT_DIR,
     IDX_LEFT_SPEED,

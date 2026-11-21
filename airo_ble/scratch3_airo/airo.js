@@ -7,11 +7,11 @@
  * Como cargarlo en TurboWarp:
  *   Editar -> Custom Extension -> Extension URL (o pegar este fichero).
  *
- *   python3 airo_server.py        ->  http://localhost:8765
+ *   python3 -m airo_ble.server        ->  http://localhost:8765
  */
 
-// Puertos donde puede estar el puente. El 8765 es el de por defecto, pero en
-// esta maquina lo ocupa `mantra-ble`, asi que se prueban varios y se usa el
+// Puertos donde puede estar el puente. El 8765 es el de por defecto, pero
+// puede estar ocupado por otra cosa, asi que se prueban varios y se usa el
 // primero que conteste CON NUESTRO estado (otro programa puede contestar un
 // 200 en /api/status sin ser el nuestro).
 const API_PORTS = [8765, 8766, 8767, 8768];
@@ -181,7 +181,7 @@ class AIRO extends Scratch3Extension {
         if (!base) {
             console.warn(
                 '[AIRO] no se pudo contactar con el servidor local. ' +
-                '¿Esta arrancado "python3 airo_server.py"?'
+                '¿Esta arrancado "python3 -m airo_ble.server"?'
             );
             return {ok: false, error: 'sin servidor local'};
         }
@@ -199,7 +199,7 @@ class AIRO extends Scratch3Extension {
         } catch (err) {
             console.warn(
                 '[AIRO] no se pudo contactar con el servidor local. ' +
-                '¿Esta arrancado "python3 airo_server.py"?',
+                '¿Esta arrancado "python3 -m airo_ble.server"?',
                 err
             );
             return {ok: false, error: String(err)};

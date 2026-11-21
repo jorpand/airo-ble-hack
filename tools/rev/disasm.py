@@ -1,14 +1,62 @@
 #!/usr/bin/env python3
-"""Desensambla metodos IL2CPP y anota strings literales y llamadas."""
+"""Desensambla metodos IL2CPP y anota strings literales y llamadas.
+
+La cadena completa esta en `docs/protocolo.md` § 3. Necesita `capstone`:
+
+    pip install capstone
+
+    python3 tools/rev/disasm.py --rev-dir ~/airo/rev
+    python3 tools/rev/disasm.py --rev-dir ~/airo/rev RobotStatus.set_LedBlue
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
 import json
+import os
 import re
 import sys
-from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM
+from pathlib import Path
 
-SO = "/workspace/airo/rev/il2cpp/lib/arm64-v8a/libil2cpp.so"
-DUMP = "/workspace/airo/rev/dump"
-LIT = f"{DUMP}/stringliteral.json"
-SCRIPT = f"{DUMP}/script.json"
+
+def _args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--rev-dir",
+        type=Path,
+        default=Path(os.environ.get("AIRO_REV_DIR") or Path(__file__).resolve().parent),
+        help="carpeta de trabajo del reversing",
+    )
+    parser.add_argument("--so", type=Path, default=None, help="libil2cpp.so")
+    parser.add_argument("--dump-dir", type=Path, default=None, help="carpeta del dump")
+    parser.add_argument("--methods", type=Path, default=None, help="el TSV de metodos")
+    parser.add_argument(
+        "filtros",
+        nargs="*",
+        help="solo estos metodos (se buscan por nombre, sin distincion de mayusculas)",
+    )
+    return parser.parse_known_args(argv)[0]
+
+
+args = _args(sys.argv[1:])
+REV = args.rev_dir
+SO = args.so or (REV / "il2cpp" / "lib" / "arm64-v8a" / "libil2cpp.so")
+DUMP = args.dump_dir or (REV / "dump")
+LIT = DUMP / "stringliteral.json"
+SCRIPT = DUMP / "script.json"
+METHODS = args.methods or (REV / "methods.tsv")
+
+if not SO.exists():
+    raise SystemExit(
+        f"no encuentro la libreria: {SO}\n"
+        "  ver docs/protocolo.md § 3 (o pasa --so / --rev-dir)"
+    )
+
+try:
+    from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM
+except ImportError:  # pragma: no cover
+    raise SystemExit("falta capstone: pip install capstone") from None
 
 so = open(SO, "rb").read()
 
@@ -126,13 +174,12 @@ def show(title, off, rva, size=0x200, max_ins=140):
 
 
 if __name__ == "__main__":
-    import csv
     targets = []
-    with open("/workspace/airo/rev/methods.tsv") as f:
+    with open(METHODS) as f:
         for row in csv.reader(f, delimiter="\t"):
             if len(row) >= 4 and row[2].startswith("0x"):
                 targets.append((row[0] + "." + row[1], int(row[3], 16), int(row[2], 16)))
-    only = sys.argv[1:] if len(sys.argv) > 1 else None
+    only = args.filtros or None
     for name, off, rva in targets:
         if only and not any(o.lower() in name.lower() for o in only):
             continue

@@ -21,29 +21,25 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.arms import (  # noqa: E402
+from airo_ble.arms import (
     LADOS,
     BrazoError,
     resolver_brazo,
     resolver_lado,
 )
-from airo_ble.client import AiroRobot  # noqa: E402
-from airo_ble.console import CALIBRATION_DEFAULT, Console  # noqa: E402
-from airo_ble.protocol import (  # noqa: E402
+from airo_ble.client import AiroRobot
+from airo_ble.console import CALIBRATION_DEFAULT, Console
+from airo_ble.protocol import (
     JOINT_NAMES,
     Command,
     Joint,
     encode_servo,
 )
-from airo_ble.session import RobotSession  # noqa: E402
-from airo_ble.server import AiroService  # noqa: E402
+from airo_ble.session import RobotSession
+from airo_ble.server import AiroService
 
 #: Byte del paquete de cada articulacion.
 #:

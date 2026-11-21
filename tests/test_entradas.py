@@ -16,18 +16,14 @@ Ejecutar: python3 -m pytest tests/test_entradas.py -v
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.arms import resolver_objetivos  # noqa: E402
-from airo_ble.client import AiroRobot  # noqa: E402
-from airo_ble.console import Console, ConsoleError  # noqa: E402
-from airo_ble.protocol import Command, Joint  # noqa: E402
-from airo_ble.server import AiroService  # noqa: E402
+from airo_ble.arms import resolver_objetivos
+from airo_ble.client import AiroRobot
+from airo_ble.console import Console, ConsoleError
+from airo_ble.protocol import Command, Joint
+from airo_ble.server import AiroService
 
 #: Byte de cada articulacion en el paquete (guia § 2).
 BYTE = {

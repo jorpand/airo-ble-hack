@@ -1,9 +1,51 @@
 #!/usr/bin/env python3
-"""Extrae RVA/Offset de metodos concretos desde el dump.cs de Il2CppDumper."""
+"""Extrae RVA/Offset de metodos concretos desde el dump.cs de Il2CppDumper.
+
+La cadena completa esta en `docs/protocolo.md` § 3. Este script solo necesita
+el `dump.cs` que deja Il2CppDumper.
+
+    python3 tools/rev/find_methods.py --rev-dir ~/airo/rev
+    python3 tools/rev/find_methods.py --dump ~/airo/rev/dump/dump.cs
+
+Si no se dice nada, se busca en `AIRO_REV_DIR` y, si tampoco esta, en la
+carpeta del propio script (donde se dejan los volcados generados).
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
 import re
 import sys
+from pathlib import Path
 
-DUMP = "/workspace/airo/rev/dump/dump.cs"
+
+def _args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--rev-dir",
+        type=Path,
+        default=Path(os.environ.get("AIRO_REV_DIR") or Path(__file__).resolve().parent),
+        help="carpeta de trabajo del reversing (donde esta dump/)",
+    )
+    parser.add_argument(
+        "--dump",
+        type=Path,
+        default=None,
+        help="el dump.cs (por defecto: <rev-dir>/dump/dump.cs)",
+    )
+    return parser.parse_args()
+
+
+args = _args()
+DUMP = args.dump or (args.rev_dir / "dump" / "dump.cs")
+
+if not DUMP.exists():
+    raise SystemExit(
+        f"no encuentro el dump.cs: {DUMP}\n"
+        "  generalo con Il2CppDumper (ver docs/protocolo.md § 3) "
+        "o pasa --dump / --rev-dir"
+    )
 
 lines = open(DUMP, encoding="utf-8", errors="replace").read().split("\n")
 

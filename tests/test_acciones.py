@@ -24,17 +24,13 @@ Ejecutar: python3 -m pytest tests/test_acciones.py -v
 from __future__ import annotations
 
 import asyncio
-import sys
 import time
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.api.models import BloqueBrazo, Programa  # noqa: E402
-from airo_ble.api.service import Traductor  # noqa: E402
-from airo_ble.arms import (  # noqa: E402
+from airo_ble.api.models import BloqueBrazo, Programa
+from airo_ble.api.service import Traductor
+from airo_ble.arms import (
     ESPERA_MINIMA,
     BrazoError,
     duracion_de_accion,
@@ -42,8 +38,8 @@ from airo_ble.arms import (  # noqa: E402
     resolver_objetivos,
     tiempo_de_viaje,
 )
-from airo_ble.protocol import Joint  # noqa: E402
-from airo_ble.session import RobotSession, Step  # noqa: E402
+from airo_ble.protocol import Joint
+from airo_ble.session import RobotSession, Step
 
 
 # ---------------------------------------------------------------------------

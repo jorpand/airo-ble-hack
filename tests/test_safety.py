@@ -19,20 +19,16 @@ Ejecutar: python3 -m pytest tests/test_safety.py -v
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.client import AiroRobot  # noqa: E402
-from airo_ble.console import Console  # noqa: E402
-from airo_ble.session import RobotSession, Step  # noqa: E402
-from airo_ble.api.main import app, servicio  # noqa: E402
-from airo_ble.api.models import Programa  # noqa: E402
-from airo_ble.api.service import Traductor  # noqa: E402
-from airo_ble.server import AiroService  # noqa: E402
+from airo_ble.client import AiroRobot
+from airo_ble.console import Console
+from airo_ble.session import RobotSession, Step
+from airo_ble.api.main import app, servicio
+from airo_ble.api.models import Programa
+from airo_ble.api.service import Traductor
+from airo_ble.server import AiroService
 
 
 # ---------------------------------------------------------------------------

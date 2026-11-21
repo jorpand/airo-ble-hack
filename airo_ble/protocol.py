@@ -3,7 +3,7 @@ Protocolo de comandos del robot Clementoni AIRO (versión 1.x).
 
 Reconstruido por ingeniería inversa inversa del APK oficial `it.clementoni.robot.airo`
 (Unity + IL2CPP), descompilando `libil2cpp.so` con Il2CppDumper y la capa Java
-con jadx. Ver `GUIA-PROGRAMAR-AIRO.md` para la cadena de evidencia.
+con jadx. Ver `docs/protocolo.md` para la cadena de evidencia.
 
 Transporte: BLE (HM-10), servicio 0000FFF0, characteristic 0000FFF1, escritura
 con respuesta (WRITE_TYPE 0x02).
@@ -68,7 +68,7 @@ class Joint(IntEnum):
     """Articulación -> servo que la mueve.
 
     Los nombres son **del robot físico** (el lado que ves al mirarlo), tal
-    como los nombra `GUIA-PROGRAMAR-AIRO.md` §2.
+    como los nombra `docs/protocolo.md` §2.
 
     Byte del paquete para cada una (ver `_JOINT_TO_INDEX`):
 
@@ -86,7 +86,7 @@ class Joint(IntEnum):
 
     Estos nombres están verificados con el robot delante (2026-11-10): el
     byte 6 levanta el brazo que está a la **derecha** del robot, mirándolo de
-    frente. Antes estaban al revés (ver `GUIA-PROGRAMAR-AIRO.md` §2).
+    frente. Antes estaban al revés (ver `docs/protocolo.md` §2).
     """
 
     RIGHT_SHOULDER = 1
@@ -101,6 +101,12 @@ _JOINT_TO_INDEX: Final[dict[Joint, int]] = {
     Joint.LEFT_ARM: IDX_SERVO_3,
     Joint.LEFT_SHOULDER: IDX_SERVO_4,
 }
+
+#: Byte del paquete que lleva cada articulacion (mismo dato que
+#: `_JOINT_TO_INDEX`, pero publico). La web lo necesita con el **mismo** origen
+#: de la verdad: `tools/gen_servos.py` genera `web/src/servos.js` con esta
+#: tabla, para que los numeros no se puedan desincronizar.
+JOINT_BYTE: Final[dict[Joint, int]] = dict(_JOINT_TO_INDEX)
 
 #: Nombres en minúsculas para la API de alto nivel (`servos(left_arm=30)`).
 JOINT_NAMES: Final[dict[str, Joint]] = {j.name.lower(): j for j in Joint}

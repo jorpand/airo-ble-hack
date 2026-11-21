@@ -3,7 +3,7 @@ API del robot Clementoni AIRO (FastAPI).
 
 Sirve la interfaz web (React) y una API JSON para programs.
 
-    uvicorn airo_ble.api.main:app --reload --port 8000
+    uvicorn airo_ble.api.main:app --reload --port 8100
 
 O directamente:
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -53,7 +54,12 @@ from .service import (
 #: Donde vive la interfaz web compilada. Solo existe en un checkout del repo
 #: (en el paquete instalado no hay `web/`), asi que se comprueba antes de
 #: montarla.
-WEB_DIR = Path(__file__).resolve().parents[2] / "web" / "dist"
+#:
+#: Se puede cambiar con la variable de entorno `AIRO_WEB_DIR`, por si la
+#: interfaz esta compilada en otro sitio (un despliegue, una copia...).
+WEB_DIR = Path(
+    os.environ.get("AIRO_WEB_DIR") or (Path(__file__).resolve().parents[2] / "web" / "dist")
+).expanduser()
 
 servicio = RobotService()
 
@@ -343,7 +349,7 @@ async def index() -> Any:
             "ok": False,
             "mensaje": (
                 "La interfaz web no esta compilada. "
-                "Haz: cd web && npm install && npm run build"
+                "Haz: cd web && npm ci && npm run build"
             ),
             "api": "/docs",
         },
@@ -360,7 +366,7 @@ def main() -> None:
     uvicorn.run(
         "airo_ble.api.main:app",
         host="127.0.0.1",
-        port=8000,
+        port=8100,
         reload=False,
         log_level="info",
     )

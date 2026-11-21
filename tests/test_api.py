@@ -10,18 +10,13 @@ Ejecutar: python3 -m pytest tests/test_api.py -v
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from fastapi.testclient import TestClient
 
-from fastapi.testclient import TestClient  # noqa: E402
-
-from airo_ble.api.main import app  # noqa: E402
-from airo_ble.api.models import Programa  # noqa: E402
-from airo_ble.api.service import (  # noqa: E402
+from airo_ble.api.main import app
+from airo_ble.api.models import Programa
+from airo_ble.api.service import (
     MAX_PASOS,
     ProgramaDemasiadoLarga,
     Traductor,

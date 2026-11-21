@@ -92,11 +92,11 @@ calibration.local.json
 # Artefactos propios del proyecto
 # ---------------------------------------------------------------------------
 # Volcados generados del desensamblado del APK: pesan ~19 MB y se
-# regeneran con los scripts de analisis/. Solo se versiona el codigo.
-analisis/*.txt
-analisis/*.tsv
-analisis/*.bin
-analisis/*.dex
+# regeneran con los scripts de tools/rev/. Solo se versiona el codigo.
+tools/rev/*.txt
+tools/rev/*.tsv
+tools/rev/*.bin
+tools/rev/*.dex
 
 # Evidencia del reversing y capturas: material de trabajo, no fuente.
 evidencia/

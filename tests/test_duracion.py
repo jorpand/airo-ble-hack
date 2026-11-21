@@ -15,18 +15,13 @@ Ejecutar: python3 -m pytest tests/test_duracion.py -v
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from fastapi.testclient import TestClient
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from airo_ble.api.main import app  # noqa: E402
-from airo_ble.api.models import Programa  # noqa: E402
-from airo_ble.api.service import Traductor  # noqa: E402
-from airo_ble.arms import SERVO_VELOCIDAD  # noqa: E402
-from airo_ble.protocol import Joint  # noqa: E402
+from airo_ble.api.main import app
+from airo_ble.api.models import Programa
+from airo_ble.api.service import Traductor
+from airo_ble.arms import SERVO_VELOCIDAD
+from airo_ble.protocol import Joint
 
 
 def _programa(bloques: list[dict]) -> Programa:

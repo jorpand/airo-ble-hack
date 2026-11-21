@@ -11,14 +11,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.client import AiroRobot  # noqa: E402
-from airo_ble.console import Console, ConsoleError, resolve_joint  # noqa: E402
-from airo_ble.protocol import (  # noqa: E402
+from airo_ble.client import AiroRobot
+from airo_ble.console import Console, ConsoleError, resolve_joint
+from airo_ble.protocol import (
     IDX_LEFT_DIR,
     IDX_LEFT_SPEED,
     IDX_LED,

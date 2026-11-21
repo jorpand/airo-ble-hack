@@ -20,7 +20,7 @@ Con esto puedes escribir **tu propio cliente en Python** (`bleak`) y mandar tus 
 Lo más rápido para trastear con el robot delante es la **consola interactiva**:
 
 ```bash
-python3 airo_console.py
+python3 -m airo_ble.console
 airo> avanzar 2
 airo> led flash
 airo> pose right_shoulder 30
@@ -98,9 +98,9 @@ Este es el corazón del tema. La clase `RobotStatus` (en el código C# de la app
 > 7=0, y en la foto el brazo levantado es el de la **izquierda de la imagen**,
 > o sea el **derecho del robot** (que está mirando a cámara). Al revés para
 > `brazo izquierdo arriba` (bytes 8=40 y 9=23, brazo a la derecha de la
-> imagen). Fotos: `evidencia/hardware_verif_brazo_derecho_arriba.jpg`,
-> `evidencia/hardware_verif_brazo_izquierdo_arriba.jpg` y
-> `evidencia/hardware_verif_lado_izq_der.png`.
+> imagen). Las fotos de la comprobacion con el robot delante no se publican
+> aqui (son material local de trabajo), pero el desensamblado que lo demuestra
+> si: [`docs/desensamblado/`](desensamblado/).
 >
 > Ojo también con la **cola fija**: los bytes 10..19 que pone `SetFixedBytes` **no** son una rampa arbitraria, sino los **mismos valores que usan los servos**: `5, 22, 39, 56, 73, 90, 107, 124, 141, 158` es una progresión de **5 + 17k**. El `17` es el mismo divisor que usan los servos (§ 2.5). La rampa está ahí a propósito.
 
@@ -178,7 +178,7 @@ Por eso `protocol.py` hace exactamente lo mismo: `Command.offsets` es un offset 
 
 **Esto no lo tenía claro el análisis inicial y es la parte que más falla si te la saltas.**
 
-`RobotStatus.set_ServoMotor*Angle(int)` no escribe el ángulo en el byte: escribe una **posición de servo** calculada. El desensamblado (`evidencia/RobotStatus_set_ServoMotorOneAngle.asm` y compañía) da la cadena exacta:
+`RobotStatus.set_ServoMotor*Angle(int)` no escribe el ángulo en el byte: escribe una **posición de servo** calculada. El desensamblado (`docs/desensamblado/RobotStatus_set_ServoMotorOneAngle.asm` y compañía) da la cadena exacta:
 
 ```
 byte = | 170 + signo * (ángulo + offset) | / 8.5      -> redondeo banker's
@@ -213,8 +213,9 @@ Ejemplos (sin offset, en **bytes**):
 > derecho con el hombro arriba: los bytes 23, 30 y 40 dan imágenes
 > **indistinguibles** (la diferencia de píxeles entre ellas es ruido de
 > exposición), mientras que 0, 10 y 20 se ven claramente distintos.
-> `evidencia/hardware_barrido_codo_derecho.png` es el barrido (byte 0, 10, 20
-> y 23 del codo, de izquierda a derecha).
+> El barrido (byte 0, 10, 20 y 23 del codo, de izquierda a derecha) se hizo
+> con el robot delante; las fotos no se publican, pero el script que lo midio
+> esta en [`tools/hardware/`](https://github.com/jorpand/airo-ble-hack/tree/main/tools/hardware).
 >
 > La app oficial nunca manda esos bytes: `encode_servo()` recorta el ángulo
 > **antes** de escalarlo, así que el byte que sale siempre cae dentro del
@@ -263,7 +264,9 @@ Todo sale de la app oficial, sin tocar el robot. Los pasos, por si quieres repet
    bluetoothGatt.writeCharacteristic(bluetoothGattCharacteristic);
    ```
 
-Todo el desensamblado está en `evidencia/` (18 ficheros `.asm` + `RESUMEN.md` con qué prueba cada uno).
+Todo el desensamblado está en [`docs/desensamblado/`](desensamblado/) (18 ficheros
+`.asm` + [`RESUMEN.md`](desensamblado/RESUMEN.md) con qué prueba cada uno). Los
+scripts que lo generaron estan en [`tools/rev/`](https://github.com/jorpand/airo-ble-hack/tree/main/tools/rev/).
 
 ### 3.1 Trampa: hay dos clases `RobotStatus`
 
@@ -278,7 +281,8 @@ La app contiene **dos** implementaciones distintas de `RobotStatus`: la de AIRO 
 ```bash
 cd airo
 python3 -m venv .venv && source .venv/bin/activate
-pip install bleak                 # cliente BLE
+pip install -e .                  # la libreria (con bleak)
+# o, si solo quieres el cliente BLE: pip install bleak
 ```
 
 En Linux, `bleak` necesita soporte de BlueZ: `sudo apt install python3-bleak bluez`. Y el robot debe tener las **pilas puestas** (es un módulo HM-10: se apaga solo si no detectas pila).
@@ -293,10 +297,10 @@ En Linux, `bleak` necesita soporte de BlueZ: `sudo apt install python3-bleak blu
 ### 5.0 La consola interactiva (lo más cómodo para trastear)
 
 ```bash
-python3 airo_console.py                       # busca el robot 'AIRo'
-python3 airo_console.py --address AA:BB:...   # MAC concreta
-python3 airo_console.py --dry-run             # no conecta: solo muestra los paquetes
-python3 airo_console.py --exec "avanzar 2" --exec "parar"
+python3 -m airo_ble.console                       # busca el robot 'AIRo'
+python3 -m airo_ble.console --address AA:BB:...   # MAC concreta
+python3 -m airo_ble.console --dry-run             # no conecta: solo muestra los paquetes
+python3 -m airo_ble.console --exec "avanzar 2" --exec "parar"
 ```
 
 Es una consola tipo shell donde escribes comandos y ves el paquete que sale:
@@ -427,12 +431,12 @@ Si prefieres no escanear, pásale la MAC: `AiroRobot(address="AA:BB:CC:DD:EE:FF"
 ### 5.2 CLI
 
 ```bash
-python -m airo_ble.cli scan                              # ver qué se ve por BLE
-python -m airo_ble.cli drive --left 1 --right 1 --seconds 3
-python -m airo_ble.cli pose --left-arm 30 --right-shoulder 45
-python -m airo_ble.cli led flash
-python -m airo_ble.cli dump --left 2 --right -1 --led flash --left-arm 30   # paquete offline
-python -m airo_ble.cli console                          # la consola de 5.0
+python -m airo_ble.commands scan                              # ver qué se ve por BLE
+python -m airo_ble.commands drive --left 1 --right 1 --seconds 3
+python -m airo_ble.commands pose --left-arm 30 --right-shoulder 45
+python -m airo_ble.commands led flash
+python -m airo_ble.commands dump --left 2 --right -1 --led flash --left-arm 30   # paquete offline
+python -m airo_ble.commands console                          # la consola de 5.0
 ```
 
 `dump` es el que más útil es para depurar: imprime el paquete byte a byte **sin necesidad del robot**.
@@ -478,8 +482,8 @@ Bloques: `mover el AIRO hacia delante/atras`, `girar a la izquierda/derecha`, `p
 
 **Dos cosas pratiques**:
 
-- **El puerto**: por defecto es el 8765, pero en esta maquina lo ocupa
-  `mantra-ble`. Se puede arrancar en otro (`python3 -m airo_ble.server
+- **El puerto**: por defecto es el 8765, pero puede estar ocupado por otra
+  cosa. Se puede arrancar en otro (`python3 -m airo_ble.server
   --port 8766`) y **no hay que tocar la extension**: esta prueba los puertos
   8765-8768 y se queda con el primero que conteste con el estado del AIRO
   (el `API` fijo se sustituyo por esa deteccion, porque el puerto de por
@@ -585,10 +589,8 @@ recorrido completo (170 grados del codo) se hace en **menos de un segundo**,
 asi que los 150 grados/s que usa el modelo (`arms.SERVO_VELOCIDAD`) son una
 estimacion prudente.
 
-Evidencia: `evidencia/hardware_rampa_vs_golpe.png` (la tira de fotos),
-`evidencia/hardware_rampa_inicio_golpe.jpg`,
-`evidencia/hardware_rampa_inicio_lento.jpg` y el script
-`evidencia/medida_final.py` (el que imprime las horas de reloj, para alinear
+Evidencia: las fotos del barrido (no se publican) y el script
+`tools/hardware/medida_final.py` (el que imprime las horas de reloj, para alinear
 las fotos con los comandos).
 
 ### 8.1.2 La interfaz: bugs, móvil y control (2026-11-10, tarde)
@@ -798,25 +800,29 @@ airo/
 │   ├── protocol.py     # el protocolo en sí, sin dependencias (testeable)
 │   ├── client.py       # cliente BLE con bleak
 │   ├── console.py      # consola interactiva de comandos
+│   ├── commands.py     # CLI de una vez (scan, drive, pose, led)
 │   ├── arms.py         # poses de los brazos y qué lado se mueve
 │   ├── server.py       # servidor local para el plugin de Scratch
 │   ├── api/            # backend de la interfaz web (FastAPI + Pydantic)
 │   ├── scratch3_airo/  # extension de Scratch 3 + pagina de pruebas
 │   ├── calibration.json # calibracion por defecto de los brazos
-│   └── cli.py          # línea de comandos
-├── airo_console.py     # atajo a la consola interactiva
-├── airo_server.py      # atajo al servidor de Scratch
-├── web/                # interfaz React (Vite) — src/angulos.js = el mapeo de los servos
+│   └── py.typed        # la libreria viene con los tipos
+├── web/                # interfaz React (Vite) — src/servos.js se GENERA desde protocol.py
 ├── tests/              # tests del protocolo, la consola, los brazos y el servidor
-├── evidencia/          # 18 .asm con el desensamblado que prueba cada byte
-├── analisis/           # scripts de ingeniería inversa usados (reproducibles)
-└── requirements.txt
+├── docs/               # esta guia + el desensamblado que prueba cada byte
+├── tools/              # scripts de ingeniería inversa y de medicion con el robot
+└── pyproject.toml      # las dependencias y los scripts de consola
 ```
 
 > Todo lo que se instala (`pip install .`) vive dentro de `airo_ble/`. La
 > calibración que se guarda con `calib guardar` va a
 > `~/.config/airo-ble/calibration.json`; la del paquete es solo el valor por
 > defecto.
+>
+> Los números del protocolo están **una sola vez**, en `airo_ble/protocol.py`.
+> La web los usa también, así que `tools/gen_servos.py` genera
+> `web/src/servos.js` a partir de ahí y `tests/test_web_angulos.py` comprueba
+> que las dos copias dicen lo mismo.
 
 ## 11. Atribución
 

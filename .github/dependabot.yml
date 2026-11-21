@@ -1,7 +1,7 @@
 version: 2
 
 updates:
-  # Dependencias de Python (pyproject.toml / requirements.txt)
+  # Dependencias de Python (pyproject.toml)
   - package-ecosystem: pip
     directory: "/"
     schedule:

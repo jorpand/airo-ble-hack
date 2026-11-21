@@ -16,19 +16,14 @@ Ejecutar: python3 -m pytest tests/test_guardado.py -v
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from fastapi.testclient import TestClient
 
-from fastapi.testclient import TestClient  # noqa: E402
-
-from airo_ble.api import guardado as almacen  # noqa: E402
-from airo_ble.api.main import app  # noqa: E402
-from airo_ble.api.models import Funcion, Programa  # noqa: E402
-from airo_ble.api.service import (  # noqa: E402
+from airo_ble.api import guardado as almacen
+from airo_ble.api.main import app
+from airo_ble.api.models import Funcion, Programa
+from airo_ble.api.service import (
     FuncionDesconocida,
     MAX_PROFUNDIDAD_FUNCIONES,
     Traductor,

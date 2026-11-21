@@ -11,15 +11,11 @@ Ejecutar: python3 -m pytest tests/test_session.py -v
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.protocol import Command  # noqa: E402
-from airo_ble.session import RobotSession  # noqa: E402
+from airo_ble.protocol import Command
+from airo_ble.session import RobotSession
 
 
 class RobotFalso:

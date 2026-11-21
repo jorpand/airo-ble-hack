@@ -6,12 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "airo-ble"
 version = "1.0.0"
 description = "Cliente BLE del robot Clementoni AIRO (habla su idioma de 20 bytes)"
-readme = "GUIA-PROGRAMAR-AIRO.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "airo-ble" }]
 keywords = ["airo", "clementoni", "robot", "ble", "bluetooth"]
 classifiers = [
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: Home Automation",
 ]
@@ -48,14 +49,18 @@ dev = [
 ]
 
 [project.scripts]
+# La CLI de una vez (scan, drive, pose, led...).
+airo = "airo_ble.commands:main"
+# La consola interactiva (con historial y `ayuda`).
 airo-console = "airo_ble.console:main"
+# El puente para el plugin de Scratch.
 airo-server = "airo_ble.server:main"
 
 [project.urls]
 Homepage = "https://github.com/jorpand/airo-ble-hack"
 Repository = "https://github.com/jorpand/airo-ble-hack"
 Issues = "https://github.com/jorpand/airo-ble-hack/issues"
-Documentacion = "https://github.com/jorpand/airo-ble-hack/blob/main/GUIA-PROGRAMAR-AIRO.md"
+Documentacion = "https://github.com/jorpand/airo-ble-hack/blob/main/docs/protocolo.md"
 
 [tool.setuptools]
 packages = ["airo_ble", "airo_ble.api", "airo_ble.scratch3_airo"]
@@ -67,6 +72,8 @@ airo_ble = ["py.typed", "calibration.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+# La raiz del repo en el path, para poder importar `airo_ble` sin instalar.
+pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 # Los avisos de deprecacion que salen de NUESTRO codigo son un error: asi
@@ -85,7 +92,7 @@ extend-exclude = [
     ".venv-3.14",
     "web",
     "evidencia",
-    "analisis",
+    "tools",
 ]
 
 # Solo se comprueban los errores que de verdad rompen el codigo (sintaxis y

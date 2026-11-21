@@ -1,5 +1,11 @@
 # Plan de mejoras y lista de tareas — repo `airo`
 
+> **Nota:** este documento es un **log de trabajo histórico**: cuenta lo que se
+> hizo, con sus decisiones y sus errores. No es la guía de uso (eso está en
+> [`protocolo.md`](protocolo.md)) ni la estructura actual del repo (eso está
+> en el README). Los nombres de fichero que se mencionan son los de cuando se
+> escribió cada entrada.
+
 > **Estado: Fases 1, 2 (A+B+2.8+2.9+2.6), la tanda "roto y verificado" y el
 > modelo de acciones APLICADAS.**
 > El 2026-11-10, con el robot delante y una cámara, se ha corregido el lado
@@ -57,7 +63,7 @@ Ademas, la mini paleta de dentro de un "repetir" **excluia** el propio bloque
 | RJ-02 | La mini paleta ofrece tambien "Repite" | `web/src/main.jsx` |
 | RJ-03 | Al soltar, se limpia el estado de arrastre (el `dragend` no llegaba porque React redibuja el nodo del que se arrastra) | `web/src/main.jsx` |
 
-### Evidencia (`evidencia/probar_repetir.py`, con el navegador)
+### Evidencia (`tools/hardware/probar_repetir.py`, con el navegador)
 
 | Prueba | Resultado |
 |---|---|
@@ -99,7 +105,7 @@ guardados y las funciones en una **columna nueva a la derecha**.
 
 ### Evidencia
 
-`evidencia/probar_guardado.py` lo prueba **en el navegador** (Playwright), de
+`tools/hardware/probar_guardado.py` lo prueba **en el navegador** (Playwright), de
 punta a punta:
 
 | Paso | Resultado |
@@ -163,9 +169,10 @@ teclado.
 
 ### Evidencia
 
-`evidencia/interfaz/`: `antes_escritorio_1440.png`, `antes_tablet_820.png`,
+`evidencia/interfaz/` (local, no se publica): `antes_escritorio_1440.png`,
+`antes_tablet_820.png`,
 `antes_movil_390.png` (los bugs) y `despues_*.png` (despues). El script
-`evidencia/capturar_interfaz.py` no solo saca las capturas: **comprueba el
+`tools/hardware/capturar_interfaz.py` no solo saca las capturas: **comprueba el
 arrastrar y soltar de verdad** con el navegador (Playwright) y escribe lo que
 ha pasado en un JSON.
 
@@ -182,7 +189,7 @@ Comprobado con el navegador (Chromium headless, 2026-11-10):
 | Atajos | Ctrl+Z (8 → 0 bloques), Alt+↓ mueve el bloque seleccionado, Supr lo borra (8 → 7), Ctrl+Enter ejecuta |
 
 Ademas, la duracion estimada se ha **comprobado contra el robot real**
-(`evidencia/medir_duracion.py`, programa de luz + espera, que no mueve nada):
+(`tools/hardware/medir_duracion.py`, programa de luz + espera, que no mueve nada):
 
 ```
 Lo que dice la API:  3.40 s (por bloque: [0.4, 3.0])
@@ -256,9 +263,9 @@ Ademas: el recorrido completo (170 grados del codo) se hace en **menos de un
 segundo**, asi que los 150 grados/s del modelo (`arms.SERVO_VELOCIDAD`) son
 prudentes.
 
-Evidencia: `evidencia/hardware_rampa_vs_golpe.png` y las fotos sueltas;
-scripts: `evidencia/medida_final.py`, `evidencia/verificar_rampa.py`,
-`evidencia/comparar_lento_vs_golpe.py`.
+Evidencia: las fotos del barrido (no se publican);
+scripts: `tools/hardware/medida_final.py`, `tools/hardware/verificar_rampa.py`,
+`tools/hardware/comparar_lento_vs_golpe.py`.
 
 ### Lo que falta
 
@@ -284,7 +291,7 @@ brazo **izquierdo** del robot.
    el robot **mira a la cámara**. Mirándolo de frente, su brazo derecho es el
    de la **izquierda** de la imagen. Y el byte 6 levanta **precisamente** ese
    brazo (el de la izquierda de la imagen).
-2. **El desensamblado.** `evidencia/AiroControl_set_RightShoulderAngle.asm`:
+2. **El desensamblado.** `docs/desensamblado/AiroControl_set_RightShoulderAngle.asm`:
    el "hombro derecho" de la app llama a `SetFirstServoMotor` → **byte 6**.
    Los hombros y los codos de la app **no** están cruzados con los del robot.
 3. **La propia guía**, que se contradecía: su §2 verificaba en el hardware que
@@ -309,7 +316,7 @@ brazo **izquierdo** del robot.
 | `airo_ble/arms.py`, `console.py`, `session.py` | Comentarios y textos de ayuda. |
 | `web/src/angulos.js` | La tabla de articulaciones (byte ↔ nombre ↔ signo ↔ lado). |
 | `web/src/styles.css` | `.robot-brazo-der` sale ahora a la **izquierda** de la pantalla: el robot se dibuja de frente, así que su brazo derecho se ve a la izquierda. El dibujo **no cambia** de aspecto: antes ya coincidía por casualidad. |
-| `GUIA-PROGRAMAR-AIRO.md`, `README.md` | La tabla de bytes, la nota del cruce (las ruedas sí están cruzadas; los brazos no) y la tabla de poses. |
+| `protocolo.md`, `README.md` | La tabla de bytes, la nota del cruce (las ruedas sí están cruzadas; los brazos no) y la tabla de poses. |
 | `tests/*` | Los tests fijan los **bytes**, no los nombres: se adaptan y siguen fijando lo mismo. |
 
 La suite sigue en **138 tests** (pytest) + **31** (vitest), y los bytes de cada
@@ -323,8 +330,8 @@ el paquete **interceptado** para ver los bytes que salen de verdad:
 
 | Orden | Bytes que salen | Foto | ¿Qué brazo sube? |
 |---|---|---|---|
-| `brazo derecho arriba` | 6=`0x0d` (13), 7=`0x00` (0) | `evidencia/hardware_verif_brazo_derecho_arriba.jpg` | el de la **izquierda de la imagen** = el **derecho del robot** |
-| `brazo izquierdo arriba` | 8=`0x28` (40), 9=`0x17` (23) | `evidencia/hardware_verif_brazo_izquierdo_arriba.jpg` | el de la **derecha de la imagen** = el **izquierdo del robot** |
+| `brazo derecho arriba` | 6=`0x0d` (13), 7=`0x00` (0) | foto con el robot delante (local) | el de la **izquierda de la imagen** = el **derecho del robot** |
+| `brazo izquierdo arriba` | 8=`0x28` (40), 9=`0x17` (23) | foto con el robot delante (local) | el de la **derecha de la imagen** = el **izquierdo del robot** |
 
 El robot enseña la cara (visor turquesa) en las dos fotos, así que el lado se
 lee sin ambigüedad. **El fix queda verificado en el hardware.**
@@ -355,7 +362,7 @@ que 0, 10 y 20 se ven claramente distintos:
 Es consecuencia de los límites del codo (−25..170) con la escala de 8,5° por
 byte. La app oficial nunca manda esos bytes (recorta el ángulo **antes** de
 escalar), así que no es un bug: solo importa si se mandan bytes a pelo con
-`set_raw_servo()`. Documentado en `GUIA-PROGRAMAR-AIRO.md` § 2.5.
+`set_raw_servo()`. Documentado en `protocolo.md` § 2.5.
 
 ### Lo que sigue SIN resolver (tarea 2.11)
 
@@ -664,7 +671,7 @@ Al implementar la Fase 1 aparecieron **dos falsos positivos** del plan inicial
 
 | Área | Estado | Hallazgos |
 |---|---|---|
-| Protocolo BLE / framing | Correcto | `FIXED_TAIL`, magic `0xA5`, payload de 20 B: coinciden 1:1 con `evidencia/*.asm` |
+| Protocolo BLE / framing | Correcto | `FIXED_TAIL`, magic `0xA5`, payload de 20 B: coinciden 1:1 con `docs/desensamblado/*.asm` |
 | Ruedas (motores) | **Correcto** | `encode_motor(invert=...)` reproduce exactamente la tabla de ruedas cruzadas del desensamblado |
 | Servos (brazos) | **Roto** | 3 bugs de mirrored-side + 1 inconsistencia de fórmula de calibrado |
 | Parada de emergencia / seguridad | **Roto** | El watchdog nunca frena; los programas terminan con las ruedas en marcha |
@@ -814,7 +821,7 @@ proceso queda en un bucle silencioso reintentando.
 ## 3. Discrepancias de protocolo (contrastadas con el desensamblado)
 
 Esta sección documenta el trabajo de **verificación cruzada** contra
-`evidencia/*.asm`, que es la fuente de verdad. Resultado por byte del paquete:
+`docs/desensamblado/*.asm`, que es la fuente de verdad. Resultado por byte del paquete:
 
 | Byte | Campo | Veredicto |
 |---|---|---|
@@ -878,7 +885,7 @@ ha movido.
 
 ### ℹ️ D-02 — La guía simplifica la regla de escalado
 
-`GUIA-PROGRAMAR-AIRO.md` §2.5 describe `170 + signo*(ángulo+offset)`, pero el
+`protocolo.md` §2.5 describe `170 + signo*(ángulo+offset)`, pero el
 asm real calcula el offset **dentro** del paréntesis para el signo + y **fuera**
 para el signo − (`170 − ángulo − offset` es idéntico a `170 − (ángulo+offset)`,
 así que en la práctica coinciden). La simplificación es aceptable, pero la
@@ -895,9 +902,9 @@ Prioridad: **P0** = seguridad / el robot se mueve solo · **P1** = funcional rot
 
 | # | Tarea | Detalle | Estado |
 |---|---|---|---|
-| 0.1 | **Fijar la semántica de "lado" del robot** | Reconciliar: (a) tabla de bytes de `GUIA-PROGRAMAR-AIRO.md` §2 líneas 63-66 (byte 6 = "Hombro izquierdo", ...), (b) enum `Joint` de `protocol.py`, (c) `console.ARM_POSES`. | ✅ **Resuelto con el robot delante** (tarea 2.9): la tabla de la guía tenía el byte 6 y el 9 cambiados. Ahora manda el **robot**: byte 6 = hombro derecho. |
+| 0.1 | **Fijar la semántica de "lado" del robot** | Reconciliar: (a) tabla de bytes de `protocolo.md` §2 líneas 63-66 (byte 6 = "Hombro izquierdo", ...), (b) enum `Joint` de `protocol.py`, (c) `console.ARM_POSES`. | ✅ **Resuelto con el robot delante** (tarea 2.9): la tabla de la guía tenía el byte 6 y el 9 cambiados. Ahora manda el **robot**: byte 6 = hombro derecho. |
 | 0.2 | Confirmar cuántos servos existen físicamente | El usuario habló de "los brazos (2 servos)". ¿El Clementoni AIRO tiene 2 o 4 servos? | ✅ **4 servos**: hombro + codo por cada brazo. El enum `Joint` completo es válido. |
-| 0.3 | Documentar la convención elegida | Añadir un bloque inequívoco en `GUIA-PROGRAMAR-AIRO.md` y en el docstring de `Joint`. | ⬜ Pendiente (tarea 2.8) |
+| 0.3 | Documentar la convención elegida | Añadir un bloque inequívoco en `protocolo.md` y en el docstring de `Joint`. | ⬜ Pendiente (tarea 2.8) |
 
 ### FASE 1 — Seguridad (P0) ✅ **APLICADA**
 
@@ -926,7 +933,7 @@ Prioridad: **P0** = seguridad / el robot se mueve solo · **P1** = funcional rot
 | 2.7 | Bloque "ambos" en la UI web | `api/models.py:49-54` permite `"ambos"`; la ruta underlying ya funciona. Añadido test de integración bloque→robot. | ✅ Hecho |
 | 2.8 | **Renombrar el enum `Joint` según la guía** | Byte 6 = hombro **izquierdo**, 7 = brazo izquierdo, 8 = brazo derecho, 9 = hombro derecho (según la tabla de la guía). | ⚠️ **Hecho, pero DESHECHO por la 2.9**: la tabla de la guía tenía el byte 6 y el 9 cambiados. |
 | 2.9 | **Corregir el lado físico de los brazos con el robot delante** | La guía decía que el byte 6 era el hombro **izquierdo**; con el robot en la mesa y una cámara se vio que es el **derecho** (el robot enseña la cara: ojos y LED del pecho). Consecuencia: "brazo derecho" movía el brazo **izquierdo** del robot. | ✅ **Hecho**: `Joint.RIGHT_SHOULDER` = byte 6 y `Joint.LEFT_SHOULDER` = byte 9 (y los codos igual). **Los bytes no se han movido**: el mapa byte → (signo, límites) sigue 6:+, 7:−, 8:+, 9:− y el conjunto de 4 bytes de cada pose es idéntico. `calibration.json` se re-mapeó (el cero en 16 se queda en el byte 9, ahora `left_shoulder`). La guía y el README están corregidos. |
-| 2.10 | **Documentar el rango real de bytes del codo** | Mandando bytes crudos al codo, los bytes 23/30/40 dan imágenes indistinguibles: el codo derecho solo usa 0..23 y el izquierdo 17..40. Consecuencia de los límites (−25..170) con la escala de 8,5°/byte. La app nunca manda los bytes inútiles (recorta el ángulo antes de escalar), así que no es un bug. | ✅ **Hecho**: documentado en `GUIA-PROGRAMAR-AIRO.md` § 2.5 con la evidencia (`evidencia/hardware_barrido_codo_derecho.png`). |
+| 2.10 | **Documentar el rango real de bytes del codo** | Mandando bytes crudos al codo, los bytes 23/30/40 dan imágenes indistinguibles: el codo derecho solo usa 0..23 y el izquierdo 17..40. Consecuencia de los límites (−25..170) con la escala de 8,5°/byte. La app nunca manda los bytes inútiles (recorta el ángulo antes de escalar), así que no es un bug. | ✅ **Hecho**: documentado en `docs/protocolo.md` § 2.5 con la evidencia (el barrido con el robot delante; las fotos no se publican). |
 | 2.11 | **Geometría visual real del hombro y del codo** | Con qué ángulo se ve de verdad el antebrazo para un byte dado del codo, y con qué ángulo real gira el hombro. Las fotos dan un desvío constante de ~30° en el codo y sugieren que el hombro cuelga antes del +77 de la app, pero con ±20-30° de margen (escena a contraluz, piezas de 30-60 px). | ⬜ **Abierta**: el dibujo de la web sigue el modelo de ángulos de la app oficial. No se cambia con una medición dudosa. Pendiente de repetir con luz y el robot más cerca. |
 
 ### FASE 2-bis — Lo que apareció al implementarla
@@ -1023,7 +1030,7 @@ Prioridad: **P0** = seguridad / el robot se mueve solo · **P1** = funcional rot
 - **Reproducción directa** de los bugs con scripts ejecutables sobre el código
   (se instancia `RobotSession`/`AiroRobot` reales y se inspecciona
   `robot.command.servos` / `left_speed`).
-- **Contraste con el desensamblado ARM64** en `evidencia/*.asm` byte a byte.
+- **Contraste con el desensamblado ARM64** en `docs/desensamblado/*.asm` byte a byte.
 - **Suite de tests**: `106 passed` (antes 29 passed / 10 failed).
   - `tests/test_safety.py`: 15 tests que fijan el comportamiento de seguridad
     (watchdog, fin de programa, desconexión, `/api/mover`, duración).

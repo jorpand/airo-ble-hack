@@ -9,7 +9,7 @@
 #
 # Los mismos checks se ejecutan en la CI (ver .github/workflows/ci.yml).
 
-exclude: '^(analisis/|evidencia/|web/node_modules/|web/dist/)'
+exclude: '^(evidencia/|web/dist/)'
 
 default_language_version:
   python: python3

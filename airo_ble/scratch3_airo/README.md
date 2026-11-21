@@ -21,7 +21,7 @@ El navegador no puede hablar BLE con el robot, asi que hay dos piezas:
 
 ```bash
 cd airo
-python3 airo_server.py
+python3 -m airo_ble.server
 ```
 
 Deberia salir algo como:
@@ -37,11 +37,10 @@ enciende el robot.
 
 ### Si el puerto 8765 esta ocupado
 
-En esta maquina el 8765 lo usa `mantra-ble`. Se puede arrancar el puente en
-otro puerto:
+Si el 8765 lo usa otra cosa, se puede arrancar el puente en otro puerto:
 
 ```bash
-python3 airo_server.py --port 8766
+python3 -m airo_ble.server --port 8766
 ```
 
 Y **no hay que tocar la extension**: esta prueba los puertos 8765, 8766, 8767

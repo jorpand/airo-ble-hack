@@ -33,6 +33,5 @@
 *.asm   text
 *.tsv   text
 
-# Los volcados y diffs grandes se tratan como binario para no ralentizar git
+# Los volcados grandes se tratan como binario para no ralentizar git
 *.tsv   -diff
-*.asm   -diff

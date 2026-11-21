@@ -1,104 +1,44 @@
 // Los angulos de los brazos del robot: como se convierte el byte del servo en
-// angulos y al reves.
+// angulos y al reves, y como se dibuja cada brazo en pantalla.
 //
-// Esto es el espejo de `airo_ble/protocol.py`. El byte que va al servo NO es el
-// angulo: es la posicion del servo (un byte = 8,5 grados). Antes la web usaba
-// una formula fija para las cuatro articulaciones:
+// La parte que habla del **protocolo** (el byte de cada servo, su signo, sus
+// limites y el escalado de 8,5 grados) **ya no esta escrita aqui**: sale
+// generada de `airo_ble/protocol.py` a `web/src/servos.js` con
+// `tools/gen_servos.py`.
 //
-//     angulo = ((byte - 20) / 20) * 60
+// Antes estaba duplicada a mano y ya se separo una vez: la web usaba una
+// formula unica que se equivocaba en hasta 230 grados en los codos. Ahora la
+// libreria es la unica fuente de la verdad y el test
+// `tests/test_web_angulos.py` comprueba byte a byte que las dos siguen
+// diciendo lo mismo.
 //
-// que solo valia para un caso: ademas de no respetar el signo de cada servo,
-// daba un error de hasta 230 grados en los codos (que van de -25 a +170) y
-// ni siquiera dibujaba el codo.
-//
-// Lo que hay aqui:
-//
-//   byte = |neutral + signo * angulo / 8.5|
-//   angulo = signo * (byte - neutral) * 8.5
-//
-// Ojo con las tres cosas que hacen que NO valga una formula unica:
-//
-//   - el **signo**: los dos lados giran en sentidos opuestos (byte 6 y 8 en un
-//     sentido, byte 7 y 9 en el contrario),
-//   - el **neutral**: el byte que es "angulo 0" no siempre es el 20. En la
-//     calibracion que trae el paquete, el hombro izquierdo tiene el cero en 16,
-//   - los **limites**: los hombros van de -60 a 77 y los codos de -25 a 170,
-//     cada uno con su rango.
-//
-// La calibracion (el neutral de cada articulacion) la manda el servidor en el
-// estado, en `brazos.<articulacion>.neutral`, asi que aqui no hay ningun
-// numero de calibracion escrito: solo el 20 por defecto de la app oficial.
+// Aqui solo queda lo que es **dibujo**: como se coloca cada brazo en la
+// pantalla. Eso no lo conoce Python.
 
-//: Grados de origen del escalado del servo (0xaa en el desensamblado).
-export const SERVO_ORIGIN = 170;
+import {
+  ARTICULACIONES,
+  NOMBRES,
+  SERVO_BYTE_MAX,
+  SERVO_CENTER,
+  SERVO_ORIGIN,
+  SERVO_SCALE,
+  anguloAByte,
+  byteAAngulo,
+  limitarAngulo,
+} from './servos.js';
 
-//: Un byte del servo son 8,5 grados.
-export const SERVO_SCALE = 8.5;
-
-//: Byte que la app oficial considera "angulo 0".
-export const SERVO_CENTER = 20;
-
-/**
- * Las cuatro articulaciones del robot.
- *
- * Los nombres son los FISICOS (los de la guia): `right_shoulder` es el hombro
- * derecho de verdad, que va en el byte 6 del paquete. Los signos y los limites
- * son los de `airo_ble/protocol.py`:
- *
- * | articulacion (fisica) | byte | signo | limites     |
- * |---|---|---|---|
- * | `right_shoulder`  |   6 |    +1 | -60 .. 77   |
- * | `right_arm`       |   7 |    -1 | -25 .. 170  |
- * | `left_arm`        |   8 |    +1 | -25 .. 170  |
- * | `left_shoulder`   |   9 |    -1 | -60 .. 77   |
- */
-export const ARTICULACIONES = {
-  right_shoulder: { byte: 6, signo: 1, min: -60, max: 77, lado: 'der' },
-  right_arm: { byte: 7, signo: -1, min: -25, max: 170, lado: 'der' },
-  left_arm: { byte: 8, signo: 1, min: -25, max: 170, lado: 'izq' },
-  left_shoulder: { byte: 9, signo: -1, min: -60, max: 77, lado: 'izq' },
+// Se re-exportan para que el resto de la web siga importando de aqui.
+export {
+  ARTICULACIONES,
+  NOMBRES,
+  SERVO_BYTE_MAX,
+  SERVO_CENTER,
+  SERVO_ORIGIN,
+  SERVO_SCALE,
+  anguloAByte,
+  byteAAngulo,
+  limitarAngulo,
 };
-
-/** Los nombres de las articulaciones, en el orden del enum de Python. */
-export const NOMBRES = Object.keys(ARTICULACIONES);
-
-/**
- * Recorta un angulo a los limites mecanicos de la articulacion.
- */
-export function limitarAngulo(nombre, angulo) {
-  const a = ARTICULACIONES[nombre];
-  if (!a || !Number.isFinite(angulo)) return 0;
-  const recortado = Math.min(Math.max(angulo, a.min), a.max);
-  // -0 y 0 son el mismo angulo, pero no son el mismo numero: sin esto el
-  // "angulo 0" sale como -0 y ensucia las comparaciones.
-  return recortado === 0 ? 0 : recortado;
-}
-
-/**
- * Convierte el byte del servo en el angulo de la articulacion.
- *
- * Es la inversa de `anguloAByte()`. Como el byte solo guarda 8,5 grados, el
- * angulo que sale tiene un error de hasta +-4,25 grados: es lo mejor que se
- * puede sacar del byte.
- */
-export function byteAAngulo(nombre, byte, neutral = SERVO_CENTER) {
-  const a = ARTICULACIONES[nombre];
-  if (!a || !Number.isFinite(byte)) return 0;
-  const angulo = a.signo * (byte - neutral) * SERVO_SCALE;
-  return limitarAngulo(nombre, angulo);
-}
-
-/**
- * Convierte un angulo de la articulacion en el byte del servo.
- *
- * Es el espejo de `encode_servo()` de `airo_ble/protocol.py`.
- */
-export function anguloAByte(nombre, angulo, neutral = SERVO_CENTER) {
-  const a = ARTICULACIONES[nombre];
-  if (!a || !Number.isFinite(angulo)) return SERVO_CENTER;
-  const bruto = neutral + (a.signo * limitarAngulo(nombre, angulo)) / SERVO_SCALE;
-  return Math.min(Math.max(Math.round(Math.abs(bruto)), 0), 40);
-}
 
 /**
  * El angulo que hay que dibujar de una articulacion, segun el estado.

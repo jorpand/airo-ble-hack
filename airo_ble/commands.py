@@ -1,9 +1,18 @@
 """CLI de línea de comandos para probar el Clementoni AIRO.
 
-    python -m airo_ble.cli scan
-    python -m airo_ble.cli drive --left 1 --right 1 --seconds 3
-    python -m airo_ble.cli pose --right-shoulder 45 --left-arm -20
-    python -m airo_ble.cli led flash
+    python -m airo_ble.commands scan
+    python -m airo_ble.commands drive --left 1 --right 1 --seconds 3
+    python -m airo_ble.commands pose --right-shoulder 45 --left-arm -20
+    python -m airo_ble.commands led flash
+
+Si el paquete esta instalado, tambien se puede usar el comando `airo`:
+
+    airo scan
+    airo drive --left 1 --right 1 --seconds 3
+
+Esta es la CLI de "una vez y listo". La consola interactiva (la que tiene
+historial, `ayuda` y autocompletado) esta en `airo_ble/console.py`, que se
+instala como `airo-console`.
 """
 
 from __future__ import annotations

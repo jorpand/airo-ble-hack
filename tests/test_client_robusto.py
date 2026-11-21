@@ -19,13 +19,10 @@ import asyncio
 import sys
 import time
 import types
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from airo_ble.client import (  # noqa: E402
+from airo_ble.client import (
     AiroConnectionError,
     AiroError,
     AiroNotConnected,
@@ -33,7 +30,7 @@ from airo_ble.client import (  # noqa: E402
     AiroRobot,
     AiroWriteError,
 )
-from airo_ble.protocol import (  # noqa: E402
+from airo_ble.protocol import (
     SERVICE_UUID,
     WRITE_CHARACTERISTIC_UUID,
     Command,

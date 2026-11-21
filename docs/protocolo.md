@@ -254,12 +254,12 @@ Todo sale de la app oficial, sin tocar el robot. Los pasos, por si quieres repet
 
 4. **Desensamblar** los métodos (con `capstone` para ARM64) y leer los `strb` sobre el array. Cada byte del protocolo sale de una instrucción concreta: `strb w9, [x8, #0x24]` = "data[4] = dirección del motor izquierdo".
 
-5. **La capa Java** (jadx 1.5.3 sobre `classes.dex`) confirma el envío real:
-   ```java
-   bluetoothGattCharacteristic.setValue(bArr);
-   bluetoothGattCharacteristic.setWriteType(z ? 2 : 1);  // 2 = con respuesta
-   bluetoothGatt.writeCharacteristic(bluetoothGattCharacteristic);
-   ```
+5. **La capa Java** (jadx 1.5.3 sobre `classes.dex`) confirma el envío real: la
+   librería de BLE del plugin escribe `FFF1` **con respuesta**, trocea el payload
+   si no cabe en el MTU, reintenta hasta 3 veces y reporta el fallo a Unity si la
+   llamada a bajo nivel no cuela. Los hechos, sin reproducir su código, están en
+   [§3.2](#32-la-capa-java-qué-hace-la-librería-de-ble-al-enviar); el motivo de no
+   publicar su fuente está en [§11](#11-atribución).
 
 Todo el desensamblado está en [`docs/desensamblado/`](desensamblado/) (18 ficheros
 `.asm` + [`RESUMEN.md`](desensamblado/RESUMEN.md) con qué prueba cada uno). Los
@@ -270,6 +270,73 @@ scripts que lo generaron estan en [`tools/rev/`](https://github.com/jorpand/airo
 La app contiene **dos** implementaciones distintas de `RobotStatus`: la de AIRO 1.x (la que nos interesa, con 4 servos y LED azul) y la de **AIRO PRO** (LEDs RGB, motor de pecho, efectos de sonido). Viven en el mismo APK y comparten nombre, así que es fácil desensamblar la equivocada: la 1.x está en RVAs `0x1FBC8xx`–`0x1FBF9xx`, la PRO en `0x201D3xx`–`0x201D8xx`.
 
 **Si tienes el AIRO PRO** (el de 2025, con LED RGB y modo "A.I. Pilot"), el layout es otro: `cmd[4]`=dirección izq, `cmd[5]`=velocidad izq, `cmd[6]`/`[7]`=derecha, y añade color RGB, motor de pecho y SFX. Dímelo y te lo adapto.
+
+### 3.2 La capa Java: qué hace la librería de BLE al enviar
+
+El paso 5 anterior es solo la punta del iceberg. El envío real no lo hace la app:
+lo hace el plugin de BLE (`com.shatalmic.unityandroidbluetoothlelib.UnityBluetoothLE`),
+que es el que habla con `BluetoothGatt` de Android.
+
+> **Qué es ese fichero `.java`.** Es el extracto que jadx devuelve de la clase
+> `UnityBluetoothLE` dentro del `classes.dex` de la app: unas 50 líneas
+> decompiladas de los métodos que escriben la characteristic. Servía para
+> confirmar (a ojo, leyendo el bytecode de Java) cómo se manda el paquete de
+> 20 bytes. **No se publica aquí** por licencia (ver [§11](#11-atribución)); lo
+> que sigue es la lectura de lo que hace, no su código.
+
+Lo que se ve en el comportamiento de la librería, en pseudocódigo propio:
+
+```
+al empezar una escritura:
+    si no hay nada pendiente:
+        si el MTU aún no se ha negociado o el payload cabe entero:
+            se manda el payload entero, de una vez
+        si no:
+            se guarda el payload entero y se marca "queda troceado"
+    se copia el siguiente trozo (del tamaño del MTU) y se escribe
+```
+
+Los seis hechos que se deducen de ahí:
+
+| Hecho | Detalle | Por qué te importa |
+|---|---|---|
+| **Escritura con respuesta** | `WRITE_TYPE` 2 = `WRITE_TYPE_RESPONSE` (1 = sin respuesta). La app lo pide con respuesta | El HM-10 te confirma cada paquete; si algo se pierde, se nota |
+| **Troceado por MTU** | Si el payload no cabe en el MTU negociado, se parte en trozos y se van mandando con un contador de posición | Con el MTU ATT por defecto (23 bytes) caben **20 bytes de payload**: el paquete del AIRO cabe *justo* en un solo write. Con un MTU mayor, se manda igualmente entero |
+| **Reintentos** | Al reiniciar el estado de escritura, el contador de reintentos se pone a `_writeCharacteristicRetries = 3` | Hay un presupuesto de 3 intentos por escritura |
+| **Propagación de error** | Si la llamada a `writeCharacteristic()` devuelve `false`, la librería hace `UnitySend("Error~Failed to write characteristic")` | El fallo de radio no se pierde en silencio: llega a la app como evento de error |
+| **Aviso a la app** | Al completar la escritura, la librería avisa a Unity con `DidWriteCharacteristic~` | La app sabe cuándo se ha escrito y cuándo puede mandar el siguiente |
+| **Reinicio del estado** | Al empezar, se ponen a cero el buffer, la posición, el tamaño a escribir y el contador de reintentos, y `_writeCharacteristicWithResponse` vuelve a `true` | Entre envíos no queda estado colgando |
+
+Los mensajes que la librería le devuelve a Unity (son literales que salen en el
+`classes.dex`) son estos, y dan la taxonomía de errores:
+
+```
+DidWriteCharacteristic~                        # la escritura se completó
+Error~Failed to write characteristic            # la llamada a bajo nivel falló
+Error~Response - failed to write characteristic: # falló la respuesta del robot
+Error~Mtu Request Failed:                       # no se pudo negociar el MTU
+```
+
+Dos matices que conviene tener claros:
+
+1. **El MTU se pide explícitamente** cuando la API de Android lo permite
+   (`requestMtu`), y el valor negociado se guarda para trocear. Si todavía no se
+   ha negociado, la librería manda el payload entero de una sola vez. Y avisa del
+   resultado: `MtuChanged~` cuando cambia, `Error~Mtu Request Failed: ` cuando
+   la negociación falla.
+2. **Troceado no es lo mismo que acuse.** El tipo de escritura "con respuesta" es
+   el de la characteristic (el HM-10 responde), pero la librería no implementa un
+   protocolo de reintento por paquete sobre esa respuesta: reintenta la escritura
+   (contador de 3) y, si aun así la respuesta dice que falló, lo reporta con
+   `Error~Response - failed to write characteristic: `.
+
+Y una diferencia con este repo: el cliente Python de aquí **no** copia esa
+máquina de estados. Manda el paquete de 20 bytes entero, una vez, y deja que
+`bleak`/`BlueZ` negocien el MTU. Como los 20 bytes caben en el MTU mínimo por
+defecto, el resultado en el cable es el mismo, con menos piezas.
+
+> Lo de "con respuesta" es el mismo dato que aparece en la tabla del [§1](#1-el-robot-por-dentro):
+> el firmware te puede confirmar cada paquete de 20 bytes.
 
 ---
 
@@ -826,5 +893,6 @@ airo/
 ## 11. Atribución
 
 - El análisis es de la app de Clementoni/Ubisive, que es código propietario. Aquí solo se documenta el **protocolo de comunicación** para que puedas controlar tu propio robot: es el mismo tipo de trabajo que hacer un cliente propio para un dispositivo Bluetooth.
-- La lib de BLE del plugin es `com.shatalmic.unityandroidbluetoothlelib.UnityBluetoothLE` (open source).
+- La librería de BLE que usa el plugin (`com.shatalmic.unityandroidbluetoothlelib.UnityBluetoothLE`) **no es open source**: es una extensión de pago de Unity Asset Store ("Bluetooth LE for iOS, tvOS and Android", de Shatalmic, LLC), bajo la EULA estándar de Unity Asset Store, que pide mantener el código fuente del asset en privado. Por eso **este repo no reproduce su código fuente**: lo que aparece en el [§3.2](#32-la-capa-java-qué-hace-la-librería-de-ble-al-enviar) son hechos observables sobre el envío (tipo de escritura, troceado por MTU, reintentos, mensajes de error), que son datos sobre el protocolo, no código.
+- Ni la app de Clementoni ni el plugin de Shatalmic se incluyen ni se redistribuyen aquí: esto es un cliente propio y su documentación.
 - `bleak` (MIT).

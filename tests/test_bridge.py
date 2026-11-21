@@ -341,6 +341,24 @@ async def test_la_placa_reenvia_el_paquete() -> None:
     assert all(e[2] == b"\xa5\x01" for e in cliente.ble.escrituras)
 
 
+async def test_un_paquete_fallido_se_vuelve_a_mandar(puente: Any) -> None:
+    """Si la escritura falla, el paquete se reenvía en el siguiente intento.
+
+    Si no, el "no se puede escribir" se tragaria el paquete hasta el
+    siguiente latido de seguridad (1 s), que es tiempo de robot andando.
+    """
+    url, cliente = puente
+    robot = BridgeRobot(url)
+    cliente.conn = -1
+    with pytest.raises(AiroNotConnected):
+        await robot.send(Command())
+
+    # ahora el robot vuelve, y el mismo paquete se manda otra vez
+    cliente.conn = 1
+    await robot.send(Command())
+    assert len(cliente.recibidos) == 1
+
+
 # --- La cadena entera: sesion y API -> puente -> placa -------------------------
 
 

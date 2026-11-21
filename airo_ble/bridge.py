@@ -166,6 +166,9 @@ class BridgeRobot:
             return datos
         respuesta = await self._peticion("POST", "/escribir", datos)
         if not respuesta.get("ok"):
+            # El paquete se da por no entregado: el siguiente intento lo
+            # manda otra vez, sin esperar al latido de seguridad.
+            self._ultimo = None
             error = str(respuesta.get("error") or "no se pudo escribir")
             if "no hay conexion" in error or "no hay conexión" in error:
                 self._conectado = False
@@ -191,6 +194,7 @@ class BridgeRobot:
             return datos
         respuesta = await self._peticion("POST", "/escribir", datos)
         if not respuesta.get("ok"):
+            self._ultimo = None
             raise AiroWriteError(
                 f"No se pudo escribir en el robot: {respuesta.get('error')}"
             )

@@ -176,7 +176,7 @@ Detalles del hardware:
 - **PSRAM octal de 8 MB**: la N16R8 lleva PSRAM *octal*, así que toca la build
   `SPIRAM_OCT` de MicroPython (la normal solo auto-detecta PSRAM_quad). Binario
   exacto para esta placa y versión:
-  `https://micropython.org/resources/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-20250911-v1.26.1.bin`
+  `https://micropython.org/resources/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-20260824-v1.29.0.bin`
   (1,7 MB). Se fija **v1.26.1** a propósito: es la misma versión que trae Ubuntu
   26.04 en sus repos, así que la CI y el chip hablan el mismo MicroPython.
 - **Reloj**: MicroPython avisa de que en ESP32 el clock del sistema no debe bajar de
@@ -209,7 +209,7 @@ Comandos preparados (una vez que la placa se vea en `/dev/ttyUSB0`):
 ```bash
 pip install esptool mpremote
 esptool --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 \
-    ~/.cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.26.1.bin
+    ~/.cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.29.0.bin
 mpremote connect /dev/ttyUSB0 fs cp main.py :main.py
 mpremote connect /dev/ttyUSB0 reset
 ```

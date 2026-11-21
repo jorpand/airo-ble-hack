@@ -22,16 +22,41 @@ protocolo no se duplica ni se toca.
 ```bash
 # el firmware: 1,7 MB, con la PSRAM octal
 mkdir -p ~/.cache/airo-firmware
-curl -L -o ~/.cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.26.1.bin \
-  https://micropython.org/resources/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-20250911-v1.26.1.bin
+curl -L -o ~/.cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.29.0.bin \
+  https://micropython.org/resources/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-20260824-v1.29.0.bin
 
 # y al chip (cambia /dev/ttyUSB0 si tu puerto es otro)
 python -m esptool --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 \
-  ~/.cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.26.1.bin
+  ~/.cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.29.0.bin
 ```
 
-La versión es la **v1.26.1** a propósito: es la misma que trae Ubuntu 26.04 en
-sus repos, así que la CI y el chip hablan el mismo MicroPython.
+La versión es la **v1.29.0**, la última estable. Ojo: la build normal solo
+auto-detecta la PSRAM *quad*, y esta placa (N16R8) lleva PSRAM **octal**, así que
+hace falta la variante `SPIRAM_OCT`.
+
+## La API de `bluetooth` en la práctica
+
+Estas son las rarezas que hay que tener en el bolsillo, todas comprobadas
+contra la placa (no salen en la documentación):
+
+| Lo que parece | Lo que hay que hacer |
+|---|---|
+| `bluetooth.UUID16(0xFFF0)` | No existe: es `bluetooth.UUID(0xFFF0)` |
+| `str(uuid)` → `"0000fff0-…"` | Es `"UUID(0xfff0)"`. Mejor comparar con `bytes(uuid)` |
+| `bluetooth._IRQ_SCAN_RESULT` | No existen: los eventos van numerados (ver `main.py`) |
+| Conexión hecha → IRQ 1 | En el port NimBLE, `gap_connect` avisa con el **7** |
+| `gap_scan(0)` para parar | No: `gap_scan(0)` deja el escaneo para siempre. Se para con `gap_scan(None)` |
+| Descubrir `UUID(0xFFF0)` | El robot lo registra con UUID de 128 bits: hay que descubrir **todo** y filtrar |
+| `print(..., flush=True)` | No existe en MicroPython |
+
+Y el layout de los datos de cada evento (en 1.26 y en 1.29 es el mismo):
+
+```
+SCAN_RESULT            (addr_type, addr, adv_type, rssi, adv_data)
+GATTC_SERVICE_RESULT   (conn_handle, inicio, fin, uuid)
+GATTC_CHARACTERISTIC   (conn_handle, fin, handle, props, uuid)
+GATTC_WRITE_DONE       (conn_handle, value_handle, status)
+```
 
 ## Ejecutar el spike
 

@@ -29,7 +29,7 @@ AIRO_PUERTO = "8100"
 #: aparezca (ttyACM* para el USB nativo, ttyUSB* para el puente UART).
 AIRO_SERIAL = ""
 #: El firmware de MicroPython para el ESP32-S3 con PSRAM octal.
-AIRO_FIRMWARE = "{{env.HOME}}/cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.26.1.bin"
+AIRO_FIRMWARE = "{{env.HOME}}/cache/airo-firmware/ESP32_GENERIC_S3-SPIRAM_OCT-v1.29.0.bin"
 
 [tasks.setup]
 description = "Crea el venv e instala el proyecto (Python + Node)"

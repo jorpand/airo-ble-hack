@@ -2,7 +2,7 @@
     "description": "Puente BLE del robot AIRO para ESP32-S3 (MicroPython)",
     "version": "0.1.0",
     "requires": [
-        "micropython>=1.26.1"
+        "micropython>=1.29.0"
     ],
     "dependencies": {},
     "env": {

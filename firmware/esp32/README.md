@@ -159,7 +159,7 @@ Sin esa variable, todo sigue yendo por BLE directo.
 ## Ejecutar el spike (a pelo, sin el servidor HTTP)
 
 ```bash
-python -m mpremote connect /dev/ttyUSB0 run firmware/esp32/spike.py
+mise run firmware-spike      # o: python -m mpremote connect /dev/ttyUSB0 run firmware/esp32/spike.py
 ```
 
 Lo que hace, paso a paso:

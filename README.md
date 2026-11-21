@@ -288,7 +288,8 @@ Todo el ciclo local pasa por **mise**. `mise tasks` lista las tareas:
 | `mise run console` | la consola interactiva |
 | `mise run scratch` | el puente para el plugin de Scratch |
 | `mise run firmware-flash` | flashea el firmware de MicroPython en el ESP32-S3 |
-| `mise run firmware-run` | ejecuta el firmware en el ESP32-S3 |
+| `mise run firmware-run` | arranca el puente en la placa (servidor HTTP y BLE) |
+| `mise run firmware-spike` | ejecuta el spike de la Fase 0 (robot encendido) |
 | `mise run firmware-wifi` | copia las credenciales de la WiFi a la placa |
 | `mise run firmware-logs` | muestra en el terminal lo que dice la placa |
 | `mise run puente` | habla con el robot a través del puente (`AIRO_BRIDGE_URL`) |

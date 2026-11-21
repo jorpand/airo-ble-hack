@@ -129,12 +129,23 @@ $AIRO_PYTHON -m esptool --chip esp32s3 --port "$PUERTO" write_flash 0x0 $AIRO_FI
 """
 
 [tasks.firmware-run]
-description = "Ejecuta el spike del puente en el ESP32-S3"
+description = "Arranca el puente del ESP32-S3 (servidor HTTP y BLE)"
 run = """
 PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
 if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
 echo "Puerto: $PUERTO"
 $AIRO_PYTHON -m mpremote connect "$PUERTO" run {{config_root}}/firmware/esp32/main.py
+"""
+
+[tasks.firmware-spike]
+description = "Ejecuta el spike de la Fase 0 (escribe los 20 bytes y mueve el robot)"
+#: Es lo que hay que hacer con el robot encendido: busca al robot, se
+#: conecta, escribe el paquete de parar y el de avanzar un segundo.
+run = """
+PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
+if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
+echo "Puerto: $PUERTO"
+$AIRO_PYTHON -m mpremote connect "$PUERTO" run {{config_root}}/firmware/esp32/spike.py
 """
 
 [tasks.firmware-logs]

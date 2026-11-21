@@ -118,6 +118,7 @@ class FakeScanner:
 
     async def start(self):
         self.arrancado = True
+        assert self.detection_callback is not None, "el escaner se llama sin callback"
         for _ in range(self.anuncios):
             self.detection_callback(FakeDevice(self.direccion), FakeAdv(rssi=self.rssi))
 
@@ -127,8 +128,8 @@ class FakeScanner:
 
 def install_fake_bleak() -> None:
     module = types.ModuleType("bleak")
-    module.BleakClient = FakeClient
-    module.BleakScanner = FakeScanner
+    setattr(module, "BleakClient", FakeClient)
+    setattr(module, "BleakScanner", FakeScanner)
     sys.modules["bleak"] = module
 
 
@@ -346,8 +347,8 @@ async def test_el_enlace_se_compueba_al_conectar() -> None:
             return False
 
     module = types.ModuleType("bleak")
-    module.BleakClient = ClienteColgado
-    module.BleakScanner = FakeScanner
+    setattr(module, "BleakClient", ClienteColgado)
+    setattr(module, "BleakScanner", FakeScanner)
     sys.modules["bleak"] = module
 
     robot = AiroRobot()

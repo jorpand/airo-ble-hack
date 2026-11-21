@@ -6,11 +6,15 @@ React y un plugin de Scratch. Todo el detalle del protocolo está en
 
 ## Puesta en marcha
 
+El entorno lo pone [mise](https://mise.jdx.dev): las versiones (Python 3.14
+y Node 22), el venv y los comandos, todo en `mise.toml`.
+
 ```bash
-make install     # crea el venv, instala la libreria + la API + los tests
+mise install     # descarga Python 3.14 y Node 22
+mise run setup   # crea el venv, instala la libreria + la API + los tests
 ```
 
-O a mano:
+Sin mise, a mano:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -21,20 +25,22 @@ cd web && npm ci
 La interfaz web se compila aparte (la build no se versiona):
 
 ```bash
-make web         # = cd web && npm ci && npm run build
+mise run web     # = cd web && npm ci && npm run build
 ```
 
 ## Antes de abrir un PR
 
 ```bash
-make test        # pytest + vitest
-make lint        # ruff + los hooks de pre-commit
+mise run test    # pytest + vitest
+mise run lint    # ruff + los hooks de pre-commit
+mise run types   # pyright
 ```
 
 | Qué | Cuántos |
 |---|---|
 | `pytest` | 196 tests de Python |
 | `npm test` | 95 tests de la interfaz |
+| `pyright` | 0 errores (modo `standard`) |
 
 Ojo: `pre-commit` **no** deja hacer commit directamente en `main` (hook
 `no-commit-to-branch`). Trabaja en una rama y abre un PR.
@@ -65,7 +71,7 @@ su signo, sus límites, el escalado de 8,5 grados). La web los necesita
 también, así que **se generan**:
 
 ```bash
-make web-gen      # regenera web/src/servos.js
+mise run web-gen   # regenera web/src/servos.js
 ```
 
 Si tocas `protocol.py` y no regeneras, `tests/test_web_angulos.py` falla. No
@@ -76,11 +82,25 @@ edites `web/src/servos.js` a mano: se sobrescribe.
 Está todo en el `.gitignore`, pero por si acaso:
 
 - `.venv*`, `node_modules/`, `__pycache__/`, caches de pytest/ruff/vite.
-- `web/dist/`: es la build de Vite. Se regenera con `make web`.
+- `web/dist/`: es la build de Vite. Se regenera con `mise run web`.
 - `tools/rev/*.txt` y `*.tsv`: los volcados generados (~19 MB). Los scripts
   que los producen sí están.
 - `evidencia/`: las capturas y el material de trabajo del reversing. El
   desensamblado que sí se publica está en `docs/desensamblado/`.
+
+## Los tipos
+
+El paquete lleva `py.typed` y se comprueba con **pyright** en modo
+`standard` (configuración en `[tool.pyright]` de `pyproject.toml`):
+
+```bash
+mise run types
+```
+
+Los hooks de pre-commit tambien lo comprueban, asi que un error de tipos
+salta antes del commit. Si pyright se queja de algo que no puedes cambiar
+(una libreria de terceros sin stubs), se desactiva **en esa linea**, con un
+comentario que explique por que.
 
 ## Reglas de estilo
 

@@ -280,8 +280,10 @@ La app contiene **dos** implementaciones distintas de `RobotStatus`: la de AIRO 
 
 ```bash
 cd airo
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .                  # la libreria (con bleak)
+mise run setup                    # venv + libreria + web (ver mise.toml)
+# o a mano:
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -e .              # la libreria (con bleak)
 # o, si solo quieres el cliente BLE: pip install bleak
 ```
 
@@ -811,7 +813,8 @@ airo/
 ├── tests/              # tests del protocolo, la consola, los brazos y el servidor
 ├── docs/               # esta guia + el desensamblado que prueba cada byte
 ├── tools/              # scripts de ingeniería inversa y de medicion con el robot
-└── pyproject.toml      # las dependencias y los scripts de consola
+├── mise.toml           # el entorno local: versiones (Python 3.14, Node 22) y tareas
+└── pyproject.toml      # las dependencias, los scripts y la config de ruff/pyright
 ```
 
 > Todo lo que se instala (`pip install .`) vive dentro de `airo_ble/`. La

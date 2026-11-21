@@ -532,8 +532,8 @@ class Console:
         await self.parar()
         return "Ruedas paradas."
 
-    def _cmd_stop(self, args: list[str]) -> str:
-        return self._cmd_parar(args)
+    async def _cmd_stop(self, args: list[str]) -> str:
+        return await self._cmd_parar(args)
 
     def _drive(self, args: list[str], *, left: float, right: float) -> str:
         speed = self._speed(args[0]) if args else 1.0

@@ -7,7 +7,7 @@ name = "airo-ble"
 version = "1.0.0"
 description = "Cliente BLE del robot Clementoni AIRO (habla su idioma de 20 bytes)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "airo-ble" }]
 keywords = ["airo", "clementoni", "robot", "ble", "bluetooth"]
@@ -42,10 +42,16 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
     "playwright>=1.40",
-    # El TestClient de FastAPI necesita un cliente HTTP. A partir de
-    # Python 3.11 se usa httpx2; antes, httpx.
-    "httpx>=0.27; python_version < '3.11'",
-    "httpx2>=2.0; python_version >= '3.11'",
+    # El TestClient de FastAPI necesita un cliente HTTP: starlette 1.x usa
+    # httpx2 y las versiones antiguas, httpx. Se instalan los dos.
+    "httpx>=0.27",
+    "httpx2>=2.0",
+    # Los hooks de pre-commit y el chequeo de tipos.
+    "pre-commit>=3.6",
+    "pyright>=1.1.414",
+    "ruff>=0.17.6",
+    # Para los scripts de desensamblado (tools/rev).
+    "capstone>=5.0",
 ]
 
 [project.scripts]
@@ -85,7 +91,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 # Carpetas que no son codigo nuestro (artefactos y material de reversing).
 extend-exclude = [
@@ -99,3 +105,36 @@ extend-exclude = [
 # nombres indefinidos). No se reformatea el repo: el estilo es el de siempre.
 [tool.ruff.lint]
 select = ["E9", "F63", "F7", "F82"]
+
+[tool.pyright]
+#: La libreria (lo que se instala) y los tests. Los scripts de tools/ que
+#: no son del paquete (los de reversing y los de medicion) se dejan fuera:
+#: dependen de herramientas externas y de un robot.
+include = ["airo_ble", "tests", "tools/gen_servos.py"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv*",
+    "web",
+    "evidencia",
+    "build",
+    "dist",
+]
+#: El venv del proyecto: asi pyright ve bleak, fastapi, pydantic...
+#: Es el que crea `mise run setup`.
+venvPath = "."
+venv = ".venv"
+#: Donde esta `disasm.py`, que usan los scripts de tools/hardware/.
+extraPaths = ["tools/rev"]
+#: La version con la que se desarrolla (ver mise.toml). Si se usa algo mas
+#: nuevo, lo pilla la CI, que prueba tambien con 3.11 (la mas antigua que
+#: promete el paquete).
+pythonVersion = "3.14"
+#: "standard" es lo que aguanta el codigo entero sin quejarse. "strict" esta
+#: a un paso (avisa sobre todo de los tests que tocan interiores).
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+#: Avisar de lo que esta deprecado: es lo que mas duele cuando Python se
+#: mueve (por ejemplo, en 3.14 `@asynccontextmanager` pide `AsyncGenerator`
+#: en vez de `AsyncIterator`).
+reportDeprecated = "error"

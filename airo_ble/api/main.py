@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
@@ -70,7 +70,7 @@ servicio = RobotService()
 
 
 @contextlib.asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Arranque y apagado de la API.
 
     Esto sustituye a los `@app.on_event("startup"/"shutdown")`, que FastAPI

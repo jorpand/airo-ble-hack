@@ -3,7 +3,7 @@
 //
 // Este fichero sale de `airo_ble/protocol.py` (la fuente de la verdad) con:
 //
-//     python3 tools/gen_servos.py         # o `make web-gen`
+//     python3 tools/gen_servos.py         # o `mise run web-gen`
 //     python3 tools/gen_servos.py --check # solo comprueba que esta al dia
 //
 // Si lo tocas a mano, el test `tests/test_web_angulos.py` falla.

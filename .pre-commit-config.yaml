@@ -52,3 +52,11 @@ repos:
     rev: v8.28.0
     hooks:
       - id: gitleaks
+
+  # --- Tipos --------------------------------------------------------------
+  # Pyright en modo "standard" (ver [tool.pyright] en pyproject.toml). La
+  # configuracion apunto al venv del proyecto, asi que ve bleak, fastapi...
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.414
+    hooks:
+      - id: pyright

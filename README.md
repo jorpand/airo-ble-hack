@@ -15,15 +15,21 @@ El análisis del protocolo (qué significa cada byte) está en
 
 ## Instalación
 
+El entorno de desarrollo lo pone **[mise](https://mise.jdx.dev)**: las
+versiones de Python y Node, el venv y los comandos, todo en `mise.toml`.
+
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"     # la libreria + la API + los tests
+mise install      # descarga Python 3.14 y Node 22
+mise run setup    # crea el venv e instala el proyecto
 ```
 
-O, si tienes `make`:
+A partir de ahi, todo con `mise run ...` (ver [Desarrollo](#desarrollo)).
+
+Sin mise, a mano:
 
 ```bash
-make install               # crea el venv e instala todo
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
 En Linux hace falta soporte de BlueZ: `sudo apt install python3-bleak bluez`.
@@ -184,8 +190,8 @@ airo/
 │   ├── gen_servos.py    # genera web/src/servos.js desde protocol.py
 │   ├── rev/             # scripts de ingeniería inversa
 │   └── hardware/        # scripts de medición con el robot
-├── Makefile             # install · test · web · run · lint
-└── pyproject.toml       # las dependencias y los scripts de consola
+├── mise.toml            # el entorno local: versiones, venv y tareas
+└── pyproject.toml       # las dependencias, los scripts y la config de ruff/pyright
 ```
 
 Todo lo que se instala (`pip install .`) está dentro de `airo_ble/`, así que
@@ -207,7 +213,7 @@ fórmula fija que se equivocaba en hasta 230 grados en los codos.
 
 ### Qué no está en el repo
 
-- `web/dist/`: la build de Vite. Se regenera con `make web`.
+- `web/dist/`: la build de Vite. Se regenera con `mise run web`.
 - `tools/rev/*.txt` y `tools/rev/*.tsv`: los volcados generados del APK
   (~19 MB). Los scripts que los producen sí están.
 - `evidencia/`: las capturas y el material de trabajo del reversing. El
@@ -217,7 +223,7 @@ fórmula fija que se equivocaba en hasta 230 grados en los codos.
 ## Tests
 
 ```bash
-make test                # pytest + vitest
+mise run test            # pytest + vitest
 ```
 
 O por separado:
@@ -238,32 +244,48 @@ python3 tests/test_server.py     # el servidor
 
 ## Desarrollo
 
-```bash
-make help                   # la lista de todo lo que se puede hacer
-```
+Todo el ciclo local pasa por **mise**. `mise tasks` lista las tareas:
 
 | Comando | Qué hace |
 |---|---|
-| `make install` | crea el venv e instala la librería con los extras de desarrollo |
-| `make test` | `pytest` + `vitest` |
-| `make web` | compila la interfaz (`npm ci` + `npm run build`) |
-| `make web-dev` | arranca Vite en el 5173 (para tocar la interfaz) |
-| `make run` | arranca la API web en el 8100 |
-| `make console` | la consola interactiva |
-| `make lint` | `ruff` + los hooks de pre-commit |
-| `make servos` | regenera `web/src/servos.js` desde `protocol.py` |
+| `mise run setup` | crea el venv e instala la librería con los extras de desarrollo |
+| `mise run test` | `pytest` + `vitest` |
+| `mise run test-py` / `test-web` | solo una de las dos suites |
+| `mise run types` | comprueba los tipos con **pyright** |
+| `mise run lint` | `ruff` + los hooks de pre-commit |
+| `mise run web` | compila la interfaz (`npm ci` + `npm run build`) |
+| `mise run web-dev` | arranca Vite en el 5173 (para tocar la interfaz) |
+| `mise run web-gen` | regenera `web/src/servos.js` desde `protocol.py` |
+| `mise run run` | arranca la API web en el 8100 |
+| `mise run console` | la consola interactiva |
+| `mise run scratch` | el puente para el plugin de Scratch |
+| `mise run clean` | borra las caches y la build |
 
-Los hooks de pre-commit revisan formato, sintaxis (ruff), ficheros grandes,
-conflictos de merge y **secretos** (gitleaks). La CI de GitHub Actions corre
-lo mismo: `pytest`, `npm test` y `pre-commit` en cada push y en cada PR.
+Las versiones (Python 3.14, Node 22) están en `mise.toml`, y **la CI usa el
+mismo fichero**: no puede haber una diferencia entre lo que se prueba aquí y
+lo que se prueba allí.
 
-Para instalar los hooks:
+### Los tipos
+
+El paquete viene con `py.typed` y se comprueba con
+[pyright](https://github.com/microsoft/pyright) en modo `standard`, con
+avisos de deprecaciones:
 
 ```bash
-pip install pre-commit
-pre-commit install            # se ejecuta antes de cada commit
-pre-commit run --all-files    # o sobre todo el repo
+mise run types
 ```
+
+La configuración está en `[tool.pyright]` de `pyproject.toml`.
+
+### Los hooks
+
+```bash
+mise run setup            # instala pre-commit
+pre-commit install        # se ejecuta antes de cada commit
+```
+
+Revisan formato, sintaxis (ruff), **tipos** (pyright), ficheros grandes,
+conflictos de merge y **secretos** (gitleaks).
 
 Para colaborar, mira [`CONTRIBUTING.md`](CONTRIBUTING.md).
 

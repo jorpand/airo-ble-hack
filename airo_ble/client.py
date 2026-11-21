@@ -203,7 +203,8 @@ class AiroRobot:
 
         # bleak puede "conectar" y quedarse colgado sin avisar: lo
         # comprobamos, porque luego las escrituras fallarian sin saber por que
-        if not getattr(self._client, "is_connected", True):
+        cliente = self._client
+        if cliente is None or not getattr(cliente, "is_connected", True):
             self._client = None
             raise AiroConnectionError(
                 "El enlace BLE se ha establecido pero no ha quedado conectado. "
@@ -214,7 +215,7 @@ class AiroRobot:
         if service is None:
             raise AiroConnectionError(
                 f"El robot no expone el servicio {SERVICE_UUID}. "
-                f"Servicios vistos: {[s.uuid for s in self._client.services]}"
+                f"Servicios vistos: {[s.uuid for s in cliente.services]}"
             )
         self._characteristic = self._find_characteristic(service)
         if self._characteristic is None:
@@ -223,7 +224,7 @@ class AiroRobot:
                 f"Characteristics del servicio: {[c.uuid for c in service.characteristics]}"
             )
         # guarda la MAC real (si nos pasaron la direccion a mano, se corrige)
-        self.address = getattr(self._client, "address", self.address)
+        self.address = getattr(cliente, "address", self.address)
 
     async def reconnect(self) -> None:
         """Cierra la conexion y vuelve a conectar.
@@ -247,7 +248,7 @@ class AiroRobot:
         if name == self.name or (self.address and address == self.address.lower()):
             rssi = getattr(advertisement_data, "rssi", None)
             try:
-                rssi = int(rssi)
+                rssi = int(rssi) if rssi is not None else -999
             except (TypeError, ValueError):
                 rssi = -999
             self._seen[address] = (device, rssi, time.monotonic())

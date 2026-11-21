@@ -43,9 +43,16 @@ MODULO_JS = RAIZ / "web" / "src" / "servos.js"
 GENERADOR = RAIZ / "tools" / "gen_servos.py"
 
 
-def _node() -> str | None:
+def _ruta_node() -> str | None:
     """Ruta del `node`, o None si no hay (los tests se saltan entonces)."""
     return shutil.which("node")
+
+
+def _node() -> str:
+    """La ruta del `node`. Los tests que la usan ya se han saltado si no hay."""
+    node = _ruta_node()
+    assert node is not None, "hace falta node"
+    return node
 
 
 #: Un byte son 8,5 grados: al deshacer el escalado no se puede saber mas.
@@ -115,7 +122,7 @@ console.log(JSON.stringify(salida));
     return json.loads(salida.stdout)
 
 
-def _angulos_de_js(tmp_path: Path, neutral: dict[str, int]) -> dict[str, dict[int, float]]:
+def _angulos_de_js(tmp_path: Path, neutral: dict[str, int]) -> dict[str, dict[str, float]]:
     """Le pide a node el angulo que el JS deduce de cada byte."""
     script = tmp_path / "inverso.mjs"
     script.write_text(
@@ -144,7 +151,7 @@ console.log(JSON.stringify(salida));
     return json.loads(salida.stdout)
 
 
-@pytest.mark.skipif(_node() is None, reason="hace falta node")
+@pytest.mark.skipif(_ruta_node() is None, reason="hace falta node")
 def test_el_js_calcula_el_mismo_byte_que_la_libreria(tmp_path: Path) -> None:
     """Byte a byte, para los cuatro brazos y todo su rango mecanico."""
     neutral = _neutrals()
@@ -161,7 +168,7 @@ def test_el_js_calcula_el_mismo_byte_que_la_libreria(tmp_path: Path) -> None:
             )
 
 
-@pytest.mark.skipif(_node() is None, reason="hace falta node")
+@pytest.mark.skipif(_ruta_node() is None, reason="hace falta node")
 def test_el_js_deduce_el_mismo_angulo_que_la_libreria(tmp_path: Path) -> None:
     """Deshaciendo el byte, los dos dan el mismo angulo (con +-4,25 grados)."""
     neutral = _neutrals()
@@ -180,7 +187,7 @@ def test_el_js_deduce_el_mismo_angulo_que_la_libreria(tmp_path: Path) -> None:
             )
 
 
-@pytest.mark.skipif(_node() is None, reason="hace falta node")
+@pytest.mark.skipif(_ruta_node() is None, reason="hace falta node")
 def test_el_js_redondea_como_la_libreria(tmp_path: Path) -> None:
     """El JS usa el redondeo a la par (banker's) de .NET, como Python.
 

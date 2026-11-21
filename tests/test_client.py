@@ -97,8 +97,8 @@ class FakeScanner:
 
 def install_fake_bleak() -> None:
     module = types.ModuleType("bleak")
-    module.BleakClient = FakeClient
-    module.BleakScanner = FakeScanner
+    setattr(module, "BleakClient", FakeClient)
+    setattr(module, "BleakScanner", FakeScanner)
     sys.modules["bleak"] = module
 
 

@@ -1,0 +1,93 @@
+# El entorno de desarrollo local del proyecto AIRO, TODO en un fichero.
+#
+# mise se encarga de las versiones, del venv y de los comandos. Con esto
+# instalado, no hace falta ni activar un venv a mano ni acordarse de qué
+# puerto usaba cada cosa:
+#
+#     mise install      # descarga Python 3.14 y Node 22
+#     mise run setup    # crea el venv e instala el proyecto
+#     mise run test     # pytest + vitest
+#
+# La lista de tareas: `mise tasks`
+
+[tools]
+#: La version con la que se desarrolla y se prueba. El codigo del paquete
+#: sigue siendo compatible con 3.11+, pero aqui se trabaja con la ultima.
+python = "3.14"
+#: La misma que usa la CI.
+node = "22"
+
+[env]
+#: El venv del proyecto. Todo (las tareas, los scripts, el editor) usa este
+#: Python, no el del sistema.
+AIRO_VENV = "{{config_root}}/.venv"
+#: El interprete del venv, para no depender de que este en el PATH.
+AIRO_PYTHON = "{{config_root}}/.venv/bin/python"
+#: El puerto de la API web. El proxy de Vite y la interfaz apuntan aqui.
+AIRO_PUERTO = "8100"
+
+[tasks.setup]
+description = "Crea el venv e instala el proyecto (Python + Node)"
+run = [
+  "python -m venv {{config_root}}/.venv",
+  "$AIRO_PYTHON -m pip install --upgrade pip",
+  "$AIRO_PYTHON -m pip install -e '.[dev]'",
+  "cd {{config_root}}/web && npm ci",
+]
+
+[tasks.test]
+description = "Pasa toda la suite (Python + web)"
+depends = ["test-py", "test-web"]
+
+[tasks.test-py]
+description = "Pasa los tests de Python"
+run = "$AIRO_PYTHON -m pytest -q"
+
+[tasks.test-web]
+description = "Pasa los tests de la interfaz"
+run = "cd {{config_root}}/web && npm test"
+
+[tasks.lint]
+description = "Ruff + los hooks de pre-commit"
+#: El hook que bloquea los commits en 'main' solo tiene sentido al commitear,
+#: no al revisar el repo entero.
+env = { SKIP = "no-commit-to-branch" }
+run = [
+  "$AIRO_PYTHON -m ruff check --select=E9,F63,F7,F82 .",
+  "$AIRO_PYTHON -m pre_commit run --all-files",
+]
+
+[tasks.types]
+description = "Comprueba los tipos con pyright"
+run = "$AIRO_PYTHON -m pyright"
+
+[tasks.web]
+description = "Compila la interfaz (npm ci + npm run build)"
+run = "cd {{config_root}}/web && npm ci && npm run build"
+
+[tasks.web-dev]
+description = "Arranca Vite en el 5173, para tocar la interfaz"
+run = "cd {{config_root}}/web && npm run dev"
+
+[tasks.web-gen]
+description = "Regenera web/src/servos.js desde airo_ble/protocol.py"
+run = "$AIRO_PYTHON tools/gen_servos.py"
+
+[tasks.run]
+description = "Arranca la API web con la interfaz"
+run = "$AIRO_PYTHON -m uvicorn airo_ble.api.main:app --port $AIRO_PUERTO"
+
+[tasks.console]
+description = "Arranca la consola interactiva"
+run = "$AIRO_PYTHON -m airo_ble.console"
+
+[tasks.scratch]
+description = "Arranca el puente para el plugin de Scratch"
+run = "$AIRO_PYTHON -m airo_ble.server"
+
+[tasks.clean]
+description = "Borra las caches y la build de la web"
+run = """
+find . -name '__pycache__' -type d -not -path './.venv/*' -not -path './web/node_modules/*' -exec rm -rf {} + 2>/dev/null || true
+rm -rf .pytest_cache .ruff_cache web/dist
+"""

@@ -427,7 +427,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
-    def log_message(self, formato: str, *args: Any) -> None:
+    def log_message(self, format: str, *args: Any) -> None:
         pass  # silencio: el servidor no debe ensuciar la terminal
 
 

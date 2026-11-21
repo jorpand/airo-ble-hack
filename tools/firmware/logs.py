@@ -25,11 +25,14 @@ def _reiniciar(serie: serial.Serial) -> None:
     Con el USB nativo, abrir el puerto NO reinicia la placa, asi que sin esto
     no se ve el log de arranque (que es el interesante: si entra la WiFi, si
     encuentra al robot...).
+
+    Ojo: se usan las propiedades `dtr` y `rts` (no `setDTR`/`setRTS`), que
+    es lo mismo pero es lo que ve el analizador de tipos.
     """
-    serie.setDTR(False)  # IO0 en alto: modo normal, no de arranque
-    serie.setRTS(True)  # EN en bajo: la placa se reinicia
+    serie.dtr = False  # IO0 en alto: modo normal, no de arranque
+    serie.rts = True  # EN en bajo: la placa se reinicia
     time.sleep(0.1)
-    serie.setRTS(False)  # EN en alto: la placa arranca
+    serie.rts = False  # EN en alto: la placa arranca
     time.sleep(0.2)
 
 

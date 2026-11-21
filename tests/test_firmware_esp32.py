@@ -15,29 +15,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from _firmware import CARPETA, cargar
+from _firmware import CARPETA, UUIDFalso, cargar
 
 from airo_ble.protocol import Command
-
-
-class UUIDFalso:
-    """Imita el UUID de MicroPython: 2 bytes (16 bits) o 16 bytes (128 bits).
-
-    MicroPython no tiene `UUID16` (se hace `UUID(0xFFF0)`) y guarda los
-    128 bits en little endian, con el grupo de 16 bits en las posiciones 12 y
-    13. Esto es lo que se ha visto en la placa de verdad.
-    """
-
-    def __init__(self, valor: int | str) -> None:
-        if isinstance(valor, int):
-            self.datos = bytes([valor & 0xFF, (valor >> 8) & 0xFF])
-        else:
-            # El little endian del Bluetooth es el byte a byte del canonico
-            # dado la vuelta: 0000fff0-...-00805f9b34fb -> fb349b5f...f0ff0000
-            self.datos = bytes.fromhex(valor.replace("-", ""))[::-1]
-
-    def __bytes__(self) -> bytes:
-        return self.datos
 
 
 @pytest.fixture(scope="module")
@@ -134,6 +114,70 @@ def test_es_uuid_no_confunde_otros_servicios(ble: Any) -> None:
 
 def test_mac_se_formatea(ble: Any) -> None:
     assert ble.mac(b"\xaa\xbb\xcc\xdd\xee\xff") == "AA:BB:CC:DD:EE:FF"
+
+
+# --- El flujo entero, con un BLE de mentira ---------------------------------
+
+
+async def test_el_cliente_conecta_descubre_y_escribe(ble: Any) -> None:
+    """Conectar, descubrir FFF0/FFF1 y escribir: el camino completo.
+
+    El doble de `bluetooth` avisa de la conexion con el IRQ **7** (no con
+    el 1, como haria un central de verdad). Si el firmware volviera al 1,
+    este test se caeria: es la vigilancia de esa rareza.
+    """
+    cliente = ble.ClienteAiro()
+    assert await cliente.conectar(b"\x64\xe0\x39\x2d\x90\x80", 0, 2000, 100)
+    assert cliente.conn >= 0
+    assert await cliente.descubrir(1000)
+    assert cliente.servicio == (1, 2)
+    assert cliente.caracteristica == 5
+    assert await cliente.escribir(b"\xa5\x00")
+    assert cliente.ble.escrituras[-1][2] == b"\xa5\x00"
+
+
+async def test_el_refresco_reenvia_el_ultimo_paquete(ble: Any) -> None:
+    """La placa reenvia sola el ultimo paquete (el robot los quiere seguidos)."""
+    cliente = ble.ClienteAiro()
+    await cliente.conectar(b"\x64\xe0\x39\x2d\x90\x80", 0, 2000, 100)
+    await cliente.descubrir(1000)
+    await cliente.escribir(b"\xa5\x01")
+    assert len(cliente.ble.escrituras) == 1
+    assert await cliente.refrescar()
+    assert len(cliente.ble.escrituras) == 2
+    # y es el mismo paquete
+    assert cliente.ble.escrituras[-1][2] == b"\xa5\x01"
+
+
+async def test_el_refresco_no_hace_nada_si_no_hay_paquete(ble: Any) -> None:
+    """Sin paquete guardado no hay nada que reenviar."""
+    cliente = ble.ClienteAiro()
+    await cliente.conectar(b"\x64\xe0\x39\x2d\x90\x80", 0, 2000, 100)
+    await cliente.descubrir(1000)
+    assert not await cliente.refrescar()
+    assert cliente.ble.escrituras == []
+
+
+async def test_el_refresco_cuenta_los_fallos(ble: Any) -> None:
+    """Si el robot no contesta, el refresco se da por fallido."""
+    cliente = ble.ClienteAiro()
+    await cliente.conectar(b"\x64\xe0\x39\x2d\x90\x80", 0, 2000, 100)
+    await cliente.descubrir(1000)
+    await cliente.escribir(b"\xa5\x01")
+    cliente.ble.fallar_escritura = True
+    assert not await cliente.refrescar()
+    assert cliente.fallos == 1
+
+
+async def test_el_estado_dice_cuantos_bytes_guarda(ble: Any) -> None:
+    """El estado del puente enseña el ultimo paquete guardado."""
+    cliente = ble.ClienteAiro()
+    await cliente.conectar(b"\x64\xe0\x39\x2d\x90\x80", 0, 2000, 100)
+    await cliente.descubrir(1000)
+    await cliente.escribir(b"\xa5\x01\x02")
+    estado = cliente.estado()
+    assert estado["bytes_guardados"] == 3
+    assert estado["conectado"] is True
 
 
 # --- Las rarezas de la API, vigiladas --------------------------------------------

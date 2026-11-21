@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from airo_ble.arms import BrazoError, resolver_brazo, resolver_objetivos
+from airo_ble.bridge import BridgeRobot, crear_robot
 from airo_ble.client import AiroRobot
 from airo_ble.console import load_calibration
 from airo_ble.protocol import JOINT_NAMES, SERVO_CENTER, Joint, Led
@@ -62,7 +63,9 @@ class AiroService:
         self.address = address
         self.scan_timeout = scan_timeout
         self.connect_robot = connect_robot
-        self.robot = AiroRobot(address=address, scan_timeout=scan_timeout)
+        self.robot: AiroRobot | BridgeRobot = crear_robot(
+            address=address, scan_timeout=scan_timeout
+        )
         self.loop: asyncio.AbstractEventLoop | None = None
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.ready = threading.Event()
@@ -201,7 +204,7 @@ class AiroService:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-        if self.robot._client is not None:
+        if self.robot.is_connected:
             await self.robot.send(cmd)
         return {"ok": True, "estado": self.status()}
 
@@ -246,7 +249,7 @@ class AiroService:
             actuales = dict(self.robot.command.servos)
             for joint, angle in objetivos.items():
                 self.robot.command.set_joint(joint, angle)
-            if self.robot._client is not None:
+            if self.robot.is_connected:
                 # Sin robot no hay servo al que esperar.
                 await asyncio.sleep(tiempo_de_viaje(objetivos, actuales))
 
@@ -331,7 +334,7 @@ class AiroService:
     def status(self) -> dict[str, Any]:
         cmd = self.robot.command
         return {
-            "conectado": bool(self.robot._client and self.robot._client.is_connected),
+            "conectado": bool(self.robot.is_connected),
             "led": cmd.led.name.lower(),
             "izquierda": cmd.left_speed,
             "derecha": cmd.right_speed,

@@ -21,6 +21,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from .bridge import BridgeRobot, crear_robot
 from .client import AiroRobot
 from .protocol import SERVO_CENTER, Joint, Led
 
@@ -93,7 +94,11 @@ class RobotSession:
         refresco: float = 0.05,
         espera_reconexion: float = 5.0,
     ) -> None:
-        self.robot = AiroRobot(address=address, scan_timeout=scan_timeout)
+        #: El cliente del robot: el puente del ESP32-S3 si hay uno
+        #: configurado (`AIRO_BRIDGE_URL`), si no el BLE de siempre.
+        self.robot: AiroRobot | BridgeRobot = crear_robot(
+            address=address, scan_timeout=scan_timeout
+        )
         self.refresco = refresco
         #: Segundos entre intentos de reconexion cuando se cae el enlace.
         self.espera_reconexion = espera_reconexion
@@ -465,11 +470,7 @@ class RobotSession:
     def estado(self) -> dict[str, Any]:
         cmd = self.robot.command
         return {
-            "conectado": bool(
-                self.conectado
-                and self.robot._client
-                and self.robot._client.is_connected
-            ),
+            "conectado": bool(self.conectado and self.robot.is_connected),
             "accion": self.accion_actual,
             "error": self.error,
             "luz": cmd.led.name.lower(),

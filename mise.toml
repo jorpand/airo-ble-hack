@@ -90,6 +90,21 @@ run = "$AIRO_PYTHON -m uvicorn airo_ble.api.main:app --port $AIRO_PUERTO"
 description = "Arranca la consola interactiva"
 run = "$AIRO_PYTHON -m airo_ble.console"
 
+[tasks.puente]
+description = "Habla con el robot a traves del puente del ESP32-S3"
+#: La URL del puente va en la variable de entorno AIRO_BRIDGE_URL (no se
+#: pone aqui a proposito: mise pisaria lo que exporte el shell). Si no esta
+#: puesta, se avisa en vez de hablar por Bluetooth sin querer.
+run = """
+if [ -z "$AIRO_BRIDGE_URL" ]; then
+    echo "No hay URL de puente. Exporta AIRO_BRIDGE_URL, por ejemplo:"
+    echo "    AIRO_BRIDGE_URL=http://airo-bridge.local:8080 mise run puente"
+    exit 1
+fi
+echo "Puente: $AIRO_BRIDGE_URL"
+$AIRO_PYTHON -m airo_ble.commands scan
+"""
+
 [tasks.scratch]
 description = "Arranca el puente para el plugin de Scratch"
 run = "$AIRO_PYTHON -m airo_ble.server"

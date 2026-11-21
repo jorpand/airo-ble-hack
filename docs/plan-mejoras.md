@@ -26,6 +26,73 @@
 >
 ---
 
+## 0.k. El puente BLE con un ESP32-S3 — resumen
+
+**`firmware/esp32/*` (nuevo), `airo_ble/bridge.py` (nuevo), `tests/test_bridge.py`
+(nuevo), `tests/test_firmware_esp32.py`, `docs/plan-esp32.md` (nuevo).**
+
+El plan completo, con las fases y las cuentas, está en
+[`plan-esp32.md`](plan-esp32.md). Aquí solo el resumen de **qué se ha hecho y
+qué queda**.
+
+### La decisión
+
+El robot se puede hablar **a través de un ESP32-S3** en vez de por el Bluetooth
+del portátil. El chip va al lado del robot, habla BLE con él, y el portátil le
+manda los bytes por HTTP.
+
+Lo importante es que **el ESP32 no sabe nada del protocolo AIRO**: solo escribe
+bytes en la characteristic `FFF1`. Los 20 bytes los sigue construyendo
+`airo_ble/protocol.py`, así que hay **una sola fuente de la verdad** y el
+firmware no se queda obsoleto cuando el protocolo cambie.
+
+| | Antes | Después |
+|---|---|---|
+| Quién habla BLE | el portátil | el ESP32 |
+| Quién construye el paquete | el portátil | el portátil (igual) |
+| Bluetooth en el portátil | obligatorio | opcional (`AIRO_BRIDGE_URL`) |
+
+### Lo que hay
+
+- **Firmware** (MicroPython 1.29.0, build `SPIRAM_OCT` para la PSRAM octal de la
+  N16R8): cliente BLE, servidor HTTP mínimo, WiFi y refresco del paquete.
+- **Cliente Python** (`airo_ble/bridge.py`): `BridgeRobot`, con la misma interfaz
+  que `AiroRobot`, y la fábrica `crear_robot()` que decide el camino según
+  `AIRO_BRIDGE_URL`. Es el **único** punto donde se decide, así que la consola,
+  la API web, el plugin de Scratch y la CLI se comportan igual sin tocar su
+  código.
+- **Tests**: el servidor HTTP del firmware de verdad (con un BLE de mentira)
+  contra el cliente de verdad. Sin placa y sin robot.
+
+### Las rarezas de MicroPython (todas comprobadas contra la placa)
+
+No salen en la documentación y hay que tenerlas en el bolsillo:
+
+| Lo que parece | Lo que hay |
+|---|---|
+| `bluetooth.UUID16(0xFFF0)` | No existe: es `bluetooth.UUID(0xFFF0)` |
+| `str(uuid)` → `"0000fff0-…"` | Es `"UUID(0xfff0)"`: mejor comparar con `bytes(uuid)` |
+| `bluetooth._IRQ_SCAN_RESULT` | Las constantes `_IRQ_*` no existen: los eventos van numerados |
+| Conexión hecha → IRQ 1 | En el port NimBLE, `gap_connect` avisa con el **7** |
+| `gap_scan(0)` para parar | No: `gap_scan(0)` deja el escaneo para siempre. Se para con `gap_scan(None)` |
+| Descubrir `UUID(0xFFF0)` | El robot lo registra con UUID de 128 bits: hay que descubrir **todo** y filtrar |
+| Dos escaneos a la vez | NimBLE contesta `EALREADY`: solo se admite uno |
+| `print(..., flush=True)` | No existe en MicroPython |
+
+### Lo que falta
+
+**El robot no se ha movido todavía.** La placa lo ve (`AIRo` =
+`64:E0:39:2D:90:80`), se conecta a él y descubre `FFF0`/`FFF1`, pero **falta la
+escritura real de los 20 bytes**: el robot estaba apagado (su módulo HM-10 solo
+se anuncia unos segundos tras encenderlo) y no se ha podido comprobar que se
+mueve.
+
+También falta: el paquete `micropython-mdns` en la placa (ahora el puente solo
+responde por IP) y un job de CI propio del firmware (aunque `ruff` y `pyright`
+ya lo cubren, porque `firmware/` está en la configuración).
+
+---
+
 ## 0.j. Los "repetir" anidados no funcionaban — resumen
 
 **Reportado por el usuario el 2026-11-10, noche: "los repite dentro de los repite no parecen funcionar".**

@@ -114,6 +114,13 @@ class AiroRobot:
     async def __aexit__(self, *exc_info: object) -> None:
         await self.disconnect()
 
+    @property
+    def is_connected(self) -> bool:
+        """Si el enlace BLE con el robot está vivo."""
+        return self._client is not None and bool(
+            getattr(self._client, "is_connected", False)
+        )
+
     async def connect(self) -> None:
         """Escanea, conecta y localiza servicio/characteristic.
 

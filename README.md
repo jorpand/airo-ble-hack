@@ -161,6 +161,28 @@ La extensión (`airo_ble/scratch3_airo/airo.js`) se carga en TurboWarp como
 "Custom Extension". Ver
 [`airo_ble/scratch3_airo/README.md`](airo_ble/scratch3_airo/README.md).
 
+## El puente BLE (ESP32-S3)
+
+El robot se puede hablar **a través de un ESP32-S3** en vez de por Bluetooth del
+portátil. El chip está al lado del robot, habla BLE con él y recibe los bytes
+por HTTP desde el portátil.
+
+El ESP32 **no sabe nada del protocolo**: solo escribe bytes en la
+characteristic `FFF1`. El paquete de 20 bytes lo sigue construyendo
+`airo_ble/protocol.py`, así que el protocolo no se duplica.
+
+```bash
+# en el portátil: que todo (consola, API web, Scratch) hable con la placa
+export AIRO_BRIDGE_URL=http://192.168.1.147:8080
+python -m airo_ble.console
+```
+
+Sin esa variable, todo sigue yendo por BLE directo como siempre: la variable
+solo decide **dónde** se habla con el robot.
+
+El firmware y su guía están en [`firmware/esp32/`](firmware/esp32/) y el plan
+del proyecto en [`docs/plan-esp32.md`](docs/plan-esp32.md).
+
 ## Estructura
 
 ```
@@ -168,6 +190,7 @@ airo/
 ├── airo_ble/            # LA LIBRERIA (todo lo instalable vive aqui)
 │   ├── protocol.py      # el protocolo de 20 bytes (LA fuente de la verdad)
 │   ├── client.py        # cliente BLE
+│   ├── bridge.py        # cliente del puente del ESP32-S3 (y la fábrica)
 │   ├── session.py       # conexión + ejecución de programas
 │   ├── console.py       # la consola interactiva
 │   ├── commands.py      # la CLI de una vez (scan, drive, pose, led)
@@ -265,7 +288,9 @@ Todo el ciclo local pasa por **mise**. `mise tasks` lista las tareas:
 | `mise run console` | la consola interactiva |
 | `mise run scratch` | el puente para el plugin de Scratch |
 | `mise run firmware-flash` | flashea el firmware de MicroPython en el ESP32-S3 |
-| `mise run firmware-run` | ejecuta el spike del puente en el ESP32-S3 |
+| `mise run firmware-run` | ejecuta el firmware en el ESP32-S3 |
+| `mise run firmware-wifi` | copia las credenciales de la WiFi a la placa |
+| `mise run puente` | habla con el robot a través del puente (`AIRO_BRIDGE_URL`) |
 | `mise run clean` | borra las caches y la build |
 
 Las versiones (Python 3.14, Node 22) están en `mise.toml`, y **la CI usa el

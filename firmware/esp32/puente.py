@@ -31,6 +31,24 @@ PUERTO = 8080
 #: Como se llama el puente en la red.
 HOSTNAME = "airo-bridge"
 
+#: Cada cuanto se reenvia el ultimo paquete al robot (milisegundos).
+#:
+#: La app oficial refresca cada 50 ms, asi que se copia ese ritmo.
+REFRESCO_MS = 50
+
+#: Cuantos reenvios seguidos pueden fallar antes de dejar de reenviar.
+FALLOS_MAX = 3
+
+#: Cuanto escanea la ruta `/escanear` (milisegundos).
+#:
+#: Es corto a proposito: la ruta tiene que responder rapido y el escaneo
+#: largo lo hace la tarea de fondo.
+ESCANEO_MS = 3000
+
+#: Cuanto espera la ruta `/conectar` a que la tarea de fondo pille al robot
+#: (milisegundos). El robot se anuncia a ratos, asi que esto es un rato.
+ESPERA_CONEXION_MS = 30000
+
 
 class Puente:
     """El puente: une el HTTP con el BLE."""
@@ -50,7 +68,7 @@ class Puente:
 
     async def r_escanear(self, peticion):
         """Lo que se ve por BLE ahora mismo."""
-        vistos = await self.cliente.escanear(5000)
+        vistos = await self.cliente.escanear(ESCANEO_MS)
         dispositivos = [
             {"mac": ble_robot.mac(addr), "nombre": nombre, "rssi": rssi}
             for addr, (_t, nombre, rssi) in vistos.items()
@@ -68,17 +86,22 @@ class Puente:
         return 200, {"ok": True, "bytes": len(datos)}
 
     async def r_conectar(self, peticion):
-        """Busca el robot y se conecta."""
+        """Espera a que el robot este conectado.
+
+        OJO: esta ruta **no escanea**. El escaneo lo hace la tarea de fondo
+        (`mantener_conexion`), que esta siempre mirando por el robot: si
+        esta ruta escaneara tambien, las dos cosas se pelearian por el radio
+        (NimBLE no admite dos escaneos a la vez y contesta `EALREADY`).
+
+        Asi que aqui solo se espera a que la tarea de fondo lo pille.
+        """
         if self.cliente.conn >= 0:
             return 200, {"ok": True, "mac": self.cliente.mac_robot, "ya_conectado": True}
-        addr, addr_type = await self.cliente.buscar_robot(20000, 5000, sondear=False)
-        if addr is None or addr_type is None:
+        ok = await ble_robot.esperar_hasta(
+            lambda: self.cliente.conn >= 0, ESPERA_CONEXION_MS
+        )
+        if not ok:
             return 409, {"ok": False, "error": "no se encuentra el robot"}
-        if not await self.cliente.conectar(addr, addr_type, 25000, 20000):
-            return 409, {"ok": False, "error": self.cliente.error}
-        if not await self.cliente.descubrir(15000):
-            self.cliente.desconectar()
-            return 409, {"ok": False, "error": self.cliente.error}
         return 200, {"ok": True, "mac": self.cliente.mac_robot}
 
     async def r_desconectar(self, peticion):
@@ -117,6 +140,27 @@ class Puente:
                     else:
                         print(f"no se pudo conectar: {self.cliente.error}")
             await asyncio.sleep(2)
+
+    async def refrescar(self):
+        """Reenvia el ultimo paquete cada 50 ms, como la app oficial.
+
+        El firmware del robot devuelve los brazos al reposo si deja de
+        recibir paquetes, asi que el paquete se reenvia sin parar. Lo hace
+        la placa y no el portatil: mandar 20 peticiones HTTP por segundo
+        seria mucho trafico para tan poca informacion (y el portatil solo
+        tiene que mandar el paquete cuando **cambia**).
+
+        Si el robot no contesta tres veces seguidas, se deja de reenviar
+        (el error se ve en /estado) hasta que llegue un paquete nuevo.
+        """
+        while True:
+            await asyncio.sleep(REFRESCO_MS / 1000)
+            if self.cliente.conn < 0 or not self.cliente.ultimo:
+                continue
+            if self.cliente.fallos >= FALLOS_MAX:
+                continue
+            if not await self.cliente.refrescar():
+                print(f"reenvio fallido: {self.cliente.error}")
 
 
 async def servir():

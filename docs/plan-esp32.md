@@ -83,29 +83,35 @@ paquetes.
 
 | Endpoint | Qué hace |
 |---|---|
-| `GET /salud` | "pong": para comprobar que el puente vive |
-| `GET /estado` | `{"conectado": bool, "mac": str, "nombre": str, "rssi": int, "paquetes": int, "ultimo_error": str\|null, "conectado_desde": float\|null}` |
-| `POST /escribir` | Cuerpo: **bytes crudos** (los 20 del paquete). Escribe en `FFF1`. Respuesta `{"ok": true}` o `{"ok": false, "error": "..."}` |
-| `POST /conectar` | Busca el robot (`AIRo`) y conecta. Opcional: `{"mac": "..."}` |
+| `GET /salud` | `{"ok": true, "servidor": "airo-bridge"}`: para comprobar que el puente vive |
+| `GET /estado` | `{"conectado": bool, "mac": str, "nombre": str, "rssi": int, "paquetes": int, "ultimo_error": str\|null, "servicio": [int, int], "characteristic": int, "bytes_guardados": int, "fallos": int}` |
+| `POST /escribir` | Cuerpo: **bytes crudos** (los 20 del paquete). Escribe en `FFF1`. Respuesta `{"ok": true, "bytes": 20}` o 409 con `{"error": "..."}` |
+| `POST /conectar` | Espera a que la tarea de fondo pille al robot. `{"ok": true, "mac": "..."}` o 409 con `{"error": "no se encuentra el robot"}` |
 | `POST /desconectar` | Cierra la conexión BLE |
-| `GET /escanear` | Escanear y devolver lo que se ve (para depurar) |
+| `GET /escanear` | `{"dispositivos": [{"mac": str, "nombre": str, "rssi": int}]}` (para depurar) |
 
 Detalles de diseño:
 
 - **Write con respuesta** (`gattc_write(mode=1)`) por defecto, que es lo que hace
   la app oficial, con **timeout**: el HM-10 duerme y deja la escritura colgada.
-  `?respuesta=0` para write-without-response (más rápido, sin acuse).
 - El ESP32 responde rápido: si no está conectado, `POST /escribir` devuelve 409
   con un mensaje claro, en vez de colgarse.
-- El estado se actualiza con la conexión (IRQ `_IRQ_CENTRAL_CONNECT` /
-  `_IRQ_CENTRAL_DISCONNECT`) y se consulta bajo demanda; no hace falta WebSocket en
-  el puente (la API del portátil ya tiene el suyo para la web).
+- El estado se actualiza con la conexión (IRQ 1/2 **y** 7/8) y se consulta bajo
+  demanda; no hace falta WebSocket en el puente (la API del portátil ya tiene el
+  suyo para la web).
+- **La placa reenvía sola el último paquete cada 50 ms.** El firmware del robot
+  devuelve los brazos al reposo si deja de recibir paquetes, y mandar 20 peticiones
+  HTTP por segundo sería mucho tráfico para 20 bytes. Así que el portátil solo
+  manda el paquete cuando **cambia**, y la placa se encarga del refresco.
+- **Solo hay un escaneo a la vez.** NimBLE contesta `EALREADY` si se pisan dos
+  escaneos, así que el cliente BLE lleva un candado y las rutas HTTP **no
+  escanean**: esperan a la tarea de fondo, que es la que busca al robot.
 
 ## 5. El lado Python
 
 ### 5.1 `airo_ble/bridge.py` (nuevo)
 
-Clase `AiroRobotRemoto` con **la misma interfaz async** que `AiroRobot`:
+Clase `BridgeRobot` con **la misma interfaz async** que `AiroRobot`:
 
 ```python
 async def connect(self) -> None: ...      # POST /conectar
@@ -114,11 +120,13 @@ async def send_raw(self, payload: bytes, *, force: bool = False) -> bytes: ...
 async def send(self, command: Command, *, force: bool = False) -> bytes: ...
 ```
 
-- Cliente HTTP asíncrono con **`httpx`** (se añade al extra `api`; ya es
-  transitivo de FastAPI, pero se declara explícito).
+- Cliente HTTP con **`urllib` de la biblioteca estándar**, en un hilo
+  (`asyncio.to_thread`): la librería solo depende de `bleak` y no quiere
+  arrastrar `httpx` (además, `urllib` no bloquea el event loop si va en un hilo).
 - Misma semántica de errores que hoy: si el puente contesta `{"ok": false}` →
-  `AiroWriteError` con el mensaje del puente.
-- Reintentos y timeouts con los mismos valores que `client.py`.
+  `AiroWriteError` / `AiroNotConnected` / `AiroNotFound` con el mensaje del puente.
+- El paquete se manda **solo cuando cambia** (más un latido de 1 Hz por si el
+  ESP32 se reinició y perdió el que tenía guardado).
 
 ### 5.2 Selección de backend
 
@@ -132,29 +140,36 @@ mise run run
 AIRO_BRIDGE_URL=http://airo-bridge.local:8080 mise run run
 ```
 
-- `airo_ble/session.py` elige: si hay `AIRO_BRIDGE_URL` → `AiroRobotRemoto`; si no →
-  `AiroRobot` (bleak).
-- `airo_ble/commands.py` y `airo_ble/console.py`: opción `--bridge URL` y su
-  equivalente en la consola.
-- `bleak` deja de ser obligatorio: se mueve a un extra `ble`
-  (`pip install airo-ble[ble]`). El import ya es perezoso (`client.py` lo hace
-  dentro de `connect()`), así que el cambio es de `pyproject.toml` y del mensaje
-  de error.
+- `airo_ble/bridge.py` tiene la fábrica `crear_robot()`: si hay `AIRO_BRIDGE_URL`
+  → `BridgeRobot`; si no → `AiroRobot` (bleak). **Es el único punto donde se
+  decide**, así que la consola, la API web, el puente de Scratch y la CLI se
+  comportan igual sin tocar su código.
+- `airo_ble/session.py`, `console.py`, `server.py` y `commands.py` usan la fábrica.
+- `bleak` sigue siendo una dependencia normal: el import ya es perezoso
+  (`client.py` lo hace dentro de `connect()`), así que con el puente puesto no
+  hace falta Bluetooth en el portátil.
 
 ### 5.3 Tests
 
-- Cliente del puente contra un servidor falso con `httpx.MockTransport` →
-  **tests sin hardware y sin robot**.
+- `tests/test_bridge.py`: **el servidor HTTP del firmware de verdad** (con un BLE
+  de mentira) contra **el cliente de verdad**. Así se comprueba que las dos
+  mitades del contrato encajan: caminos, códigos (409) y cuerpo (bytes crudos).
 - Tests de la selección de backend (con y sin `AIRO_BRIDGE_URL`).
-- Los 196 tests actuales siguen en verde (el camino bleak no se toca).
+- `tests/test_firmware_esp32.py`: el doble de `bluetooth` imita la placa (el IRQ
+  7, los layouts de los eventos), así que se prueba el flujo entero —conectar,
+  descubrir, escribir, refrescar— sin robot.
+- Los tests del camino bleak no se tocan: siguen en verde.
 
 ## 6. El firmware
 
 ```
 firmware/esp32/
-├── main.py       # arranque: WiFi + servidor HTTP + BLE
-├── bridge.py     # cliente BLE: escanear, conectar, descubrir, escribir
+├── main.py       # arranque: WiFi + servidor HTTP + BLE + refresco
+├── puente.py     # las rutas del puente y el mantenimiento de la conexión
+├── ble_robot.py  # cliente BLE: escanear, conectar, descubrir, escribir, refrescar
 ├── http_srv.py   # servidor HTTP mínimo sobre asyncio.start_server
+├── wifi.py       # conexión a la WiFi (las credenciales van en wifi.json)
+├── spike.py      # el spike de la Fase 0, a pelo
 ├── mip.json      # sin dependencias externas
 └── README.md     # flasheo, particiones, IP, credenciales del WiFi
 ```
@@ -193,7 +208,7 @@ Detalles del hardware:
 
 Estimaciones en jornadas a ratos (4-6 h). "Hito" = verificable con el robot delante.
 
-### Fase 0 — Spike (4-6 h) 🟢 hito
+### Fase 0 — Spike (4-6 h) 🟢 hito — **casi hecha**
 
 - **Pasar la placa a la VM**: el USB de esta VM es emulado, así que la placa hay que
   enchufarla en el host y añadirla como *USB Host Device* en virt-manager (o
@@ -214,44 +229,63 @@ mpremote connect /dev/ttyUSB0 fs cp main.py :main.py
 mpremote connect /dev/ttyUSB0 reset
 ```
 
+**Estado**: la placa está flasheada con MicroPython 1.29.0 (build `SPIRAM_OCT`),
+arranca, se conecta a la WiFi y **ve al robot** (`AIRo` = `64:E0:39:2D:90:80`) y
+**se conecta** a él. Falta el último paso: **escribir los 20 bytes y que el robot
+se mueva** (requiere el robot encendido; su módulo HM-10 solo se anuncia unos
+segundos tras encenderlo).
+
 **Criterio de salida**: el robot se mueve desde el ESP32. Si aquí no se puede, el
 proyecto se replantea sin haber gastado más que una jornada.
 
-### Fase 1 — Firmware del puente (6-10 h) 🟢 hito
+### Fase 1 — Firmware del puente (6-10 h) 🟢 hito — **hecha**
 
 - `http_srv.py`: servidor HTTP mínimo (parseo de request, JSON, `application/octet-stream`).
-- `bridge.py`: máquina de estados BLE (escanear → conectar → descubrir → escribir),
-  reconexión con backoff y timeout de escritura.
+- `ble_robot.py`: cliente BLE (escanear → conectar → descubrir → escribir →
+  refrescar), con candado, timeout de escritura y reconexión.
+- `puente.py`: las rutas y el mantenimiento de la conexión.
 - `main.py`: WiFi, arranque y apagado limpio.
-- Pruebas en el propio chip (un `self_test()` que escanea y escribe).
+- `spike.py`: el spike de la Fase 0, ejecutable a pelo.
 
 **Criterio de salida**: `curl http://<ip>:8080/estado` y `curl -X POST --data-binary
 @paquete.bin http://<ip>:8080/escribir` funcionan y el robot obedece.
 
-### Fase 2 — Backend Python (4-6 h) 🟢 hito
+**Estado**: el puente responde por HTTP desde el portátil (`/salud`, `/estado`,
+`/escanear`, `/escribir`, `/conectar`, `/desconectar`) y el cliente de Python
+habla con él de punta a punta por la red. Falta el "y el robot obedece" (el
+robot estaba apagado).
 
-- `airo_ble/bridge.py` con `AiroRobotRemoto` (httpx).
+### Fase 2 — Backend Python (4-6 h) 🟢 hito — **hecha**
+
+- `airo_ble/bridge.py` con `BridgeRobot` (y la fábrica `crear_robot`).
 - Selección de backend por `AIRO_BRIDGE_URL` en `session.py`, `commands.py`,
-  `console.py`.
-- `bleak` pasa a extra opcional.
-- Tests con `httpx.MockTransport` (sin hardware).
+  `console.py` y `server.py`.
+- Tests sin hardware: el servidor del firmware contra el cliente de verdad.
 
 **Criterio de salida**: la API del portátil, con `AIRO_BRIDGE_URL` puesto, mueve el
 robot a través del ESP32. Los tests en verde.
 
+**Estado**: el cliente y la API ya hablan con el puente (verificado contra la
+placa real). Falta lo mismo que en la Fase 0: verlo mover al robot.
+
 ### Fase 3 — Tooling, CI y documentación (4-6 h)
 
-- `mise run firmware-flash` (esptool + mpremote), `firmware-logs`, `firmware-test`.
+- `mise run firmware-flash` (esptool + mpremote), `firmware-run`, `firmware-wifi`.
 - CI: job que comprueba que el firmware pasa `ruff`/`pyright` (MicroPython es
   Python; se puede analizar con las mismas herramientas) y que `mip.json` está
   coherente.
 - `firmware/esp32/README.md`: flasheo, particiones, IP, mDNS, credenciales.
 
+**Estado**: las tareas de mise están; falta el job de CI propio del firmware y
+el `mdns` en la placa (el paquete `micropython-mdns` no está instalado, así que
+el puente solo responde por IP).
+
 **Criterio de salida**: clonar el repo en otra máquina y flashear con un comando.
 
 ### Fase 4 — Robustez (4-8 h, opcional)
 
-- Reconexión si el robot se apaga y se vuelve a encender.
+- Reconexión si el robot se apaga y se vuelve a encender. *(Hecha: la tarea de
+  fondo del puente reconecta solo.)*
 - Watchdog y reinicio limpio del puente.
 - Token simple en las peticiones (si la red no es de fiar).
 - OTA (`mpremote` + `rshell`).

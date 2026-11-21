@@ -146,6 +146,16 @@ class ClienteAiro:
         self.mac_robot = ""
         self.nombre_robot = ""
         self.rssi = 0
+        #: El ultimo paquete escrito. El puente lo reenvia solo: el robot
+        #: quiere paquetes seguidos y no tiene sentido ir por HTTP 20 veces
+        #: por segundo.
+        self.ultimo = b""
+        #: Cuantas veces seguidas ha fallado el reenvio.
+        self.fallos = 0
+        #: El BLE no admite dos escaneos a la vez (contesta `EALREADY`), y
+        #: el puente escanea en segundo plano mientras tambien atiende por
+        #: HTTP. Este candado serializa esas operaciones.
+        self.lock = asyncio.Lock()
 
     # -- IRQ ---------------------------------------------------------------
     #
@@ -187,15 +197,24 @@ class ClienteAiro:
         """Escanea `ms` milisegundos y devuelve lo que se ha visto.
 
         Devuelve un diccionario: direccion -> (tipo, nombre, rssi).
+
+        El candado es importante: el BLE no admite dos escaneos a la vez
+        (contesta `EALREADY`) y el puente escanea en segundo plano mientras
+        tambien atiende peticiones por HTTP.
         """
-        self.vistos = {}
-        self.ble.gap_scan(ms, 1280000, 11250, True)
-        await asyncio.sleep((ms + 500) / 1000)
-        # El escaneo se para antes de conectar: NimBLE no deja conectar con
-        # un descubrimiento en marcha y devuelve `EALREADY`.
-        self.ble.gap_scan(None)
-        await asyncio.sleep(0.3)
-        return self.vistos
+        async with self.lock:
+            self.vistos = {}
+            try:
+                self.ble.gap_scan(ms, 1280000, 11250, True)
+            except OSError as exc:
+                self.error = f"no se pudo escanear ({exc})"
+                return self.vistos
+            await asyncio.sleep((ms + 500) / 1000)
+            # El escaneo se para antes de conectar: NimBLE no deja conectar
+            # con un descubrimiento en marcha y devuelve `EALREADY`.
+            self.ble.gap_scan(None)
+            await asyncio.sleep(0.3)
+            return self.vistos
 
     async def buscar_robot(self, timeout_ms=30000, paso_ms=5000, sondear=True):
         """Busca al robot y devuelve (direccion, tipo) o (None, None).
@@ -242,22 +261,26 @@ class ClienteAiro:
 
         Si ya habia una conexion con ese robot, NimBLE contesta `EIO`
         ("already connected"): se cierra antes de intentar nada.
+
+        El candado serializa esta operacion con los escaneos: si hay un
+        descubrimiento en marcha, NimBLE contesta `EALREADY`.
         """
-        if self.conn >= 0:
-            self.desconectar()
-            await asyncio.sleep(0.3)
-        self.conn = -1
-        try:
-            self.ble.gap_connect(addr_type, addr, scan_ms)
-        except OSError as exc:
-            self.error = f"no se pudo conectar ({exc})"
+        async with self.lock:
+            if self.conn >= 0:
+                self.desconectar()
+                await asyncio.sleep(0.3)
+            self.conn = -1
+            try:
+                self.ble.gap_connect(addr_type, addr, scan_ms)
+            except OSError as exc:
+                self.error = f"no se pudo conectar ({exc})"
+                return False
+            if await esperar_hasta(lambda: self.conn >= 0, timeout_ms):
+                self.mac_robot = mac(addr)
+                self.error = ""
+                return True
+            self.error = "no se pudo conectar"
             return False
-        if await esperar_hasta(lambda: self.conn >= 0, timeout_ms):
-            self.mac_robot = mac(addr)
-            self.error = ""
-            return True
-        self.error = "no se pudo conectar"
-        return False
 
     async def descubrir(self, timeout_ms=TIMEOUT_MS):
         """Descubre el servicio FFF0 y la characteristic FFF1.
@@ -291,7 +314,7 @@ class ClienteAiro:
             return False
         return True
 
-    async def escribir(self, datos, con_respuesta=True):
+    async def escribir(self, datos, con_respuesta=True, timeout_ms=TIMEOUT_MS):
         """Escribe los bytes en FFF1. Devuelve True si el robot lo confirma."""
         conn = self.conn
         handle = self.caracteristica
@@ -301,13 +324,47 @@ class ClienteAiro:
         self.escrito = -1
         modo = 1 if con_respuesta else 0
         self.ble.gattc_write(conn, handle, datos, modo)
-        if not await esperar_hasta(lambda: self.escrito >= 0, TIMEOUT_MS):
+        if not await esperar_hasta(lambda: self.escrito >= 0, timeout_ms):
             self.error = "la escritura no tuvo respuesta"
             return False
         if self.escrito != 0:
             self.error = f"el robot contesto con error {self.escrito}"
             return False
         self.paquetes += 1
+        self.ultimo = bytes(datos)
+        self.fallos = 0
+        return True
+
+    async def refrescar(self, timeout_ms=500):
+        """Reenvia el ultimo paquete (el que el robot tiene guardado).
+
+        El firmware del robot devuelve los brazos al reposo si deja de
+        recibir paquetes, asi que el paquete se reenvia sin parar. Esto lo
+        hace el ESP32 y no el portatil: mandar 20 peticiones HTTP por
+        segundo seria mucho trafico para tan poca informacion.
+
+        Devuelve True si se ha reenviado bien.
+        """
+        conn = self.conn
+        handle = self.caracteristica
+        if conn < 0 or handle == 0 or not self.ultimo:
+            return False
+        self.escrito = -1
+        try:
+            self.ble.gattc_write(conn, handle, self.ultimo, 1)
+        except Exception as exc:  # pragma: no cover - depende del hardware
+            self.fallos += 1
+            self.error = f"no se pudo reenviar ({exc})"
+            return False
+        if not await esperar_hasta(lambda: self.escrito >= 0, timeout_ms):
+            self.fallos += 1
+            self.error = "el reenvio no tuvo respuesta"
+            return False
+        if self.escrito != 0:
+            self.fallos += 1
+            self.error = f"el robot contesto con error {self.escrito}"
+            return False
+        self.fallos = 0
         return True
 
     def desconectar(self):
@@ -337,4 +394,9 @@ class ClienteAiro:
             "ultimo_error": self.error or None,
             "servicio": list(self.servicio),
             "characteristic": self.caracteristica,
+            # Cuantos bytes tiene guardados el ultimo paquete y cuantos
+            # reenvios seguidos han fallado (el puente deja de reenviar si
+            # el robot no contesta).
+            "bytes_guardados": len(self.ultimo),
+            "fallos": self.fallos,
         }

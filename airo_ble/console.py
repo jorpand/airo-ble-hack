@@ -33,6 +33,7 @@ from .arms import (
     BrazoError,
     resolver_objetivos,
 )
+from .bridge import BridgeRobot, crear_robot
 from .client import AiroNotFound, AiroRobot
 from .protocol import (
     JOINT_NAMES,
@@ -231,7 +232,7 @@ class Console:
 
     def __init__(
         self,
-        robot: AiroRobot,
+        robot: AiroRobot | BridgeRobot,
         *,
         keepalive: bool = True,
         keepalive_interval: float = 0.05,
@@ -446,7 +447,7 @@ class Console:
     async def _cmd_conectar(self, args: list[str]) -> str:
         if self.dry_run:
             raise ConsoleError("En --dry-run no se puede conectar")
-        if self.robot._client is not None:
+        if self.robot.is_connected:
             return "Ya estas conectado."
         address = args[0] if args else None
         await self.connect(address)
@@ -1065,7 +1066,7 @@ async def _shutdown(console: Console) -> None:
 
 
 async def run_console(args: argparse.Namespace) -> int:
-    robot = AiroRobot(address=args.address, scan_timeout=args.scan_timeout)
+    robot = crear_robot(address=args.address, scan_timeout=args.scan_timeout)
     console = Console(
         robot,
         keepalive=not args.no_keepalive,

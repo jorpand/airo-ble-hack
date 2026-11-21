@@ -1,5 +1,6 @@
 """Cliente BLE y protocolo de comandos del robot Clementoni AIRO 1.x."""
 
+from .bridge import BridgeRobot, crear_robot, url_del_puente
 from .client import (
     AiroConnectionError,
     AiroError,
@@ -39,6 +40,9 @@ __all__ = [
     "AiroNotConnected",
     "AiroConnectionError",
     "AiroWriteError",
+    "BridgeRobot",
+    "crear_robot",
+    "url_del_puente",
     "Command",
     "Direction",
     "Joint",

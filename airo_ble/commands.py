@@ -25,6 +25,29 @@ from .protocol import JOINT_NAMES, Command, Led
 
 
 async def cmd_scan(args: argparse.Namespace) -> int:
+    """Lista los dispositivos BLE visibles.
+
+    Si hay un puente configurado (`AIRO_BRIDGE_URL`), el escaneo lo hace la
+    placa (que es la que tiene el radio cerca del robot).
+    """
+    from .bridge import BridgeRobot, url_del_puente
+
+    url = url_del_puente()
+    if url:
+        robot = BridgeRobot(url)
+        print(f"Escaneando con el puente {url}...")
+        datos = await robot.escanear()
+        dispositivos = datos.get("dispositivos") or []
+        if not dispositivos:
+            print("No se ha visto ningún dispositivo BLE.")
+            return 1
+        for dev in dispositivos:
+            print(
+                f"  {dev.get('mac', '?')}  {dev.get('nombre', ''):22s}"
+                f"  rssi={dev.get('rssi', '?')}"
+            )
+        return 0
+
     from bleak import BleakScanner
 
     print(f"Escaneando {args.timeout:.0f} s...")
@@ -43,9 +66,9 @@ async def cmd_scan(args: argparse.Namespace) -> int:
 
 
 async def cmd_drive(args: argparse.Namespace) -> int:
-    from .client import AiroRobot
+    from .bridge import crear_robot
 
-    async with AiroRobot(address=args.address) as robot:
+    async with crear_robot(address=args.address) as robot:
         await robot.drive(left=args.left, right=args.right)
         print(f"Paquete enviado:\n{robot.command.describe()}")
         try:
@@ -57,9 +80,9 @@ async def cmd_drive(args: argparse.Namespace) -> int:
 
 
 async def cmd_pose(args: argparse.Namespace) -> int:
-    from .client import AiroRobot
+    from .bridge import crear_robot
 
-    async with AiroRobot(address=args.address) as robot:
+    async with crear_robot(address=args.address) as robot:
         for name, value in vars(args).items():
             if name in JOINT_NAMES and value is not None:
                 robot.command.set_joint(JOINT_NAMES[name], value)
@@ -69,9 +92,9 @@ async def cmd_pose(args: argparse.Namespace) -> int:
 
 
 async def cmd_led(args: argparse.Namespace) -> int:
-    from .client import AiroRobot
+    from .bridge import crear_robot
 
-    async with AiroRobot(address=args.address) as robot:
+    async with crear_robot(address=args.address) as robot:
         await robot.led(Led[args.mode.upper()])
         print(f"Paquete enviado:\n{robot.command.describe()}")
     return 0

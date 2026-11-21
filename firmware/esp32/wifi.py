@@ -46,13 +46,19 @@ def conectar(ruta=RUTA_CONFIG, verbose=True):
             print(f"{ruta} no tiene 'ssid'")
         return None
 
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
+    # El nombre del host se pone **antes** de activar la WiFi: en el ESP32 el
+    # responder de mDNS se inicializa al activar la interfaz y usa el nombre
+    # que hay en ese momento. (El `wlan.config(hostname=...)` de despues ya
+    # no cambia lo que publica el mDNS: por eso el ESP32 avisa de que se use
+    # `network.hostname()`.)
     if hostname:
         try:
-            wlan.config(ifname="dhcp", hostname=hostname)
-        except (OSError, ValueError):
-            pass  # algunos firmwares no lo admiten: no es critico
+            network.hostname(hostname)
+        except (OSError, ValueError):  # pragma: no cover - depende del chip
+            pass
+
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
 
     if wlan.isconnected():
         if verbose:
@@ -80,25 +86,27 @@ def conectar(ruta=RUTA_CONFIG, verbose=True):
     return ip
 
 
-def activar_mdns(hostname="airo-bridge", verbose=True):
-    """Publica `hostname.local` en la red, para no depender de la IP.
+def publicar_nombre(hostname="airo-bridge", verbose=True):
+    """Fija el nombre del host, para que se pueda llamar `X.local`.
 
-    Necesita el modulo `mdns` (la libreria `micropython-mdns` de
-    micropython-lib). Si no esta, no pasa nada: el puente se puede llamar
-    por IP.
+    En el ESP32 el **propio port** trae el responder de mDNS: se inicializa
+    al activar la interfaz de WiFi y usa el nombre que hay en ese momento.
+    Por eso `conectar()` pone el nombre **antes** de activar la interfaz; y
+    esto lo vuelve a poner por si ya estaba conectada.
+
+    Ojo: no hace falta (ni conviene) instalar el paquete `mdns` de micropython-lib,
+    porque quiere el puerto 5353 y el del port ya lo tiene.
     """
     try:
-        import mdns
-    except ImportError:
-        if verbose:
-            print("sin mdns: usa la IP del puente")
+        import network
+    except ImportError:  # pragma: no cover - solo pasa en CPython
         return False
     try:
-        mdns.register(hostname, None)
+        network.hostname(hostname)
+    except (OSError, ValueError) as exc:  # pragma: no cover - depende del chip
         if verbose:
-            print(f"publicado como {hostname}.local")
-        return True
-    except Exception as exc:  # pragma: no cover - depende del entorno
-        if verbose:
-            print(f"mdns fallo: {exc}")
+            print(f"no se pudo fijar el nombre: {exc}")
         return False
+    if verbose:
+        print(f"nombre: {hostname}.local")
+    return True

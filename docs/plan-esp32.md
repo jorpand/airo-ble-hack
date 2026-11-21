@@ -276,9 +276,12 @@ placa real). Falta lo mismo que en la Fase 0: verlo mover al robot.
   coherente.
 - `firmware/esp32/README.md`: flasheo, particiones, IP, mDNS, credenciales.
 
-**Estado**: las tareas de mise están; falta el job de CI propio del firmware y
-el `mdns` en la placa (el paquete `micropython-mdns` no está instalado, así que
-el puente solo responde por IP).
+**Estado**: las tareas de mise están; falta el job de CI propio del firmware
+(aunque `ruff` y `pyright` ya lo cubren, porque `firmware/` está en la
+configuración). El mDNS lo trae el propio port del ESP32 (el nombre se pone
+antes de activar la interfaz, que es cuando se inicializa el responder), pero
+**no se ha podido comprobar**: en la red de pruebas el tráfico mDNS entero no
+pasaba, así que el camino que funciona es la IP.
 
 **Criterio de salida**: clonar el repo en otra máquina y flashear con un comando.
 

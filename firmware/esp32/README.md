@@ -85,8 +85,16 @@ $EDITOR firmware/esp32/wifi.json
 mise run firmware-wifi     # copia el fichero a la placa y se conecta
 ```
 
-La placa se llama `airo-bridge` por mDNS, pero el paquete `micropython-mdns`
-no está instalado, así que de momento hay que usar la IP.
+La placa se llama `airo-bridge`: el **propio port del ESP32** trae el responder de
+mDNS, así que con `network.hostname("airo-bridge")` (que `wifi.py` pone **antes**
+de activar la interfaz, que es cuando el port inicializa el responder) se puede
+llamar a `airo-bridge.local:8080`.
+
+Ojo: no hay que instalar el paquete `mdns` de micropython-lib (además, no está
+en el índice de `mip`): quiere el puerto 5353 y el del port ya lo tiene. Y que
+`airo-bridge.local` funcione depende de que la red **no filtre el multicast**:
+en la red donde se ha probado esto, el tráfico mDNS entero no pasaba, así que
+la **IP es el camino que funciona**.
 
 ## La API de `bluetooth` en la práctica
 
@@ -158,8 +166,6 @@ Lo que hace, paso a paso:
 
 ## Lo que NO está aquí todavía
 
-- `mdns`: falta el paquete `micropython-mdns`, así que el puente solo responde
-  por IP.
 - OTA: para actualizar hay que volver a copiar los ficheros con `mpremote`.
 - Token en las peticiones: si la red no es de fiar, cualquiera que llegue al
   puerto 8080 puede mover el robot.

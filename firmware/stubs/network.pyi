@@ -9,6 +9,10 @@ from typing import Any
 STA_IF: int
 AP_IF: int
 
+#: Fija (o lee) el nombre del host. En el ESP32 esto es lo que publica el
+#: responder de mDNS, asi que hay que ponerlo **antes** de activar la WiFi.
+def hostname(name: str = ..., /) -> str: ...
+
 class WLAN:
     def __init__(self, iface: int, /) -> None: ...
     def active(self, active: bool | None = ..., /) -> Any: ...

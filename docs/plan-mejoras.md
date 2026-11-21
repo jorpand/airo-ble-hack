@@ -87,9 +87,11 @@ escritura real de los 20 bytes**: el robot estaba apagado (su módulo HM-10 solo
 se anuncia unos segundos tras encenderlo) y no se ha podido comprobar que se
 mueve.
 
-También falta: el paquete `micropython-mdns` en la placa (ahora el puente solo
-responde por IP) y un job de CI propio del firmware (aunque `ruff` y `pyright`
-ya lo cubren, porque `firmware/` está en la configuración).
+También falta: un job de CI propio del firmware (aunque `ruff` y `pyright`
+ya lo cubren, porque `firmware/` está en la configuración) y comprobar el
+mDNS: el port del ESP32 ya lo trae (el nombre se pone antes de activar la
+interfaz), pero en la red de pruebas el tráfico mDNS entero no pasaba, así que
+el camino que funciona es la IP.
 
 ---
 

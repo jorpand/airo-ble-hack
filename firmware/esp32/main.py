@@ -23,7 +23,7 @@ async def main():
     """Arranca el puente."""
     ip = wifi.conectar()
     if ip:
-        wifi.activar_mdns(puente.HOSTNAME)
+        wifi.publicar_nombre(puente.HOSTNAME)
     loop = asyncio.get_event_loop()
     b = puente.Puente()
     loop.create_task(b.mantener_conexion())

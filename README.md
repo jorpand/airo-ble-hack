@@ -181,10 +181,14 @@ airo/
 │   └── calibration.json # calibración por defecto de los brazos
 ├── web/                 # interfaz React (Vite)
 │   └── src/             # el código de la interfaz
-├── tests/               # tests del protocolo, la consola y el servidor
+├── firmware/            # el firmware del ESP32-S3 (MicroPython)
+│   ├── esp32/           # el puente BLE: el chip habla con el robot
+│   └── stubs/           # stubs de MicroPython, para que pyright lo entienda
+├── tests/               # tests del protocolo, la consola, el servidor y el firmware
 ├── docs/
 │   ├── protocolo.md     # la guia del protocolo (qué significa cada byte)
 │   ├── plan-mejoras.md  # el log de trabajo (histórico)
+│   ├── plan-esp32.md    # el plan del puente BLE con ESP32-S3
 │   └── desensamblado/   # los .asm que prueban cada byte
 ├── tools/
 │   ├── gen_servos.py    # genera web/src/servos.js desde protocol.py
@@ -260,6 +264,8 @@ Todo el ciclo local pasa por **mise**. `mise tasks` lista las tareas:
 | `mise run run` | arranca la API web en el 8100 |
 | `mise run console` | la consola interactiva |
 | `mise run scratch` | el puente para el plugin de Scratch |
+| `mise run firmware-flash` | flashea el firmware de MicroPython en el ESP32-S3 |
+| `mise run firmware-run` | ejecuta el spike del puente en el ESP32-S3 |
 | `mise run clean` | borra las caches y la build |
 
 Las versiones (Python 3.14, Node 22) están en `mise.toml`, y **la CI usa el

@@ -122,7 +122,7 @@ select = ["E", "F", "W", "I", "UP", "B", "C4"]
 #: La libreria (lo que se instala) y los tests. Los scripts de tools/ que
 #: no son del paquete (los de reversing y los de medicion) se dejan fuera:
 #: dependen de herramientas externas y de un robot.
-include = ["airo_ble", "tests", "tools/gen_servos.py"]
+include = ["airo_ble", "tests", "tools/gen_servos.py", "firmware"]
 exclude = [
     "**/node_modules",
     "**/__pycache__",
@@ -132,6 +132,9 @@ exclude = [
     "build",
     "dist",
 ]
+#: Stubs de los modulos de MicroPython (el firmware del ESP32 corre en
+#: MicroPython, no en CPython, asi que `bluetooth` no existe aqui).
+stubPath = "firmware/stubs"
 #: El venv del proyecto: asi pyright ve bleak, fastapi, pydantic...
 #: Es el que crea `mise run setup`.
 venvPath = "."
@@ -146,6 +149,9 @@ pythonVersion = "3.14"
 #: a un paso (avisa sobre todo de los tests que tocan interiores).
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
+#: El firmware usa stubs de MicroPython (firmware/stubs): ahi no hay fuente
+#: que mirar, solo la forma de la API.
+reportMissingModuleSource = "none"
 #: Avisar de lo que esta deprecado: es lo que mas duele cuando Python se
 #: mueve (por ejemplo, en 3.14 `@asynccontextmanager` pide `AsyncGenerator`
 #: en vez de `AsyncIterator`).

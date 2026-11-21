@@ -873,6 +873,7 @@ airo/
 │   ├── calibration.json # calibracion por defecto de los brazos
 │   └── py.typed        # la libreria viene con los tipos
 ├── web/                # interfaz React (Vite) — src/servos.js se GENERA desde protocol.py
+├── firmware/           # firmware del ESP32-S3 (MicroPython): el puente BLE
 ├── tests/              # tests del protocolo, la consola, los brazos y el servidor
 ├── docs/               # esta guia + el desensamblado que prueba cada byte
 ├── tools/              # scripts de ingeniería inversa y de medicion con el robot

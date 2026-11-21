@@ -28,7 +28,6 @@ from airo_ble.session import NIVELES
 
 from . import guardado as almacen
 from .models import (
-    Bloque,
     DescripcionBloque,
     Estado,
     FuncionGuardada,
@@ -38,7 +37,6 @@ from .models import (
     PeticionGuardarPrograma,
     PeticionMover,
     PeticionPrograma,
-    Programa,
     ProgramaGuardado,
     RespuestaDuracion,
     RespuestaEjecucion,
@@ -48,7 +46,6 @@ from .service import (
     FuncionDesconocida,
     ProgramaDemasiadoLarga,
     RobotService,
-    Traductor,
 )
 
 #: Donde vive la interfaz web compilada. Solo existe en un checkout del repo

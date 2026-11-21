@@ -21,7 +21,6 @@ import shlex
 import signal
 import sys
 from pathlib import Path
-from typing import Any
 
 try:  # edicion de linea + historial con las flechas (Unix)
     import readline
@@ -32,7 +31,6 @@ from .arms import (
     ARM_POSES,
     ARTICULACIONES,
     BrazoError,
-    resolver_brazo,
     resolver_objetivos,
 )
 from .client import AiroNotFound, AiroRobot
@@ -539,7 +537,10 @@ class Console:
         speed = self._speed(args[0]) if args else 1.0
         self.robot.command.left_speed = left * abs(speed)
         self.robot.command.right_speed = right * abs(speed)
-        return f"Ruedas: izquierda {self.robot.command.left_speed:g}, derecha {self.robot.command.right_speed:g}"
+        return (
+            f"Ruedas: izquierda {self.robot.command.left_speed:g}, "
+            f"derecha {self.robot.command.right_speed:g}"
+        )
 
     @staticmethod
     def _speed(text: str) -> float:
@@ -583,7 +584,7 @@ class Console:
                 raise ConsoleError(
                     "Uso: pose <articulacion> <grado>  (o  pose art=grado art=grado)"
                 )
-            for name, value in zip(args[0::2], args[1::2]):
+            for name, value in zip(args[0::2], args[1::2], strict=False):
                 joint = resolve_joint(name)
                 pairs.append((joint, self._angle(joint, value)))
         for joint, angle in pairs:
@@ -1117,17 +1118,23 @@ def build_parser() -> argparse.ArgumentParser:
         prog="airo_ble.console",
         description="Consola interactiva para mandar comandos al Clementoni AIRO",
     )
-    parser.add_argument("--address", default=None, help="MAC del robot (por defecto se busca 'AIRo')")
+    parser.add_argument(
+        "--address", default=None, help="MAC del robot (por defecto se busca 'AIRo')"
+    )
     parser.add_argument("--scan-timeout", type=float, default=15.0)
     parser.add_argument("--no-connect", action="store_true", help="no conectar al arrancar")
-    parser.add_argument("--no-keepalive", action="store_true", help="no refrescar el paquete cada 50 ms")
+    parser.add_argument(
+        "--no-keepalive", action="store_true", help="no refrescar el paquete cada 50 ms"
+    )
     parser.add_argument(
         "--watchdog",
         type=float,
         default=5.0,
         help="segundos sin comandos antes de parar las ruedas (0 = sin limite)",
     )
-    parser.add_argument("--dry-run", action="store_true", help="no conectar: solo mostrar los paquetes")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="no conectar: solo mostrar los paquetes"
+    )
     parser.add_argument("--quiet", action="store_true", help="no mostrar el hex de cada envio")
     parser.add_argument(
         "--exec",

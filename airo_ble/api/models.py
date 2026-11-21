@@ -7,7 +7,7 @@ solo "avanza", "gira a la izquierda", "levanta el brazo", "un segundo", etc.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -70,7 +70,7 @@ class BloqueBrazo(BloqueBase):
     segundos: float = Field(default=0.0, ge=0.0, le=30.0)
 
     @model_validator(mode="after")
-    def _el_angulo_exacto_necesita_una_articulacion(self) -> "BloqueBrazo":
+    def _el_angulo_exacto_necesita_una_articulacion(self) -> BloqueBrazo:
         """Un solo angulo para las dos articulaciones no significa nada.
 
         Sin esta comprobacion el backend aceptaria el bloque y fallaria
@@ -116,7 +116,7 @@ class BloqueRepetir(BloqueBase):
 
     tipo: Literal["repetir"] = "repetir"
     veces: int = Field(default=2, ge=1, le=50)
-    bloques: list["Bloque"] = Field(default_factory=list)
+    bloques: list[Bloque] = Field(default_factory=list)
 
 
 class BloqueLlamada(BloqueBase):
@@ -135,18 +135,16 @@ class BloqueLlamada(BloqueBase):
 
 
 Bloque = Annotated[
-    Union[
-        BloqueAvanza,
-        BloqueAtras,
-        BloqueGira,
-        BloqueBrazo,
-        BloqueLuz,
-        BloqueEspera,
-        BloqueKata,
-        BloquePara,
-        BloqueRepetir,
-        BloqueLlamada,
-    ],
+    BloqueAvanza
+    | BloqueAtras
+    | BloqueGira
+    | BloqueBrazo
+    | BloqueLuz
+    | BloqueEspera
+    | BloqueKata
+    | BloquePara
+    | BloqueRepetir
+    | BloqueLlamada,
     Field(discriminator="tipo"),
 ]
 
@@ -225,7 +223,7 @@ class PeticionPrograma(BaseModel):
     #: Las funciones que usa el programa, por id. Se mandan **con** el
     #: programa porque una llamada es solo una referencia: el backend necesita
     #: los bloques de la funcion para desplegarla.
-    funciones: dict[str, "Funcion"] = Field(default_factory=dict)
+    funciones: dict[str, Funcion] = Field(default_factory=dict)
 
 
 class PeticionBloque(BaseModel):

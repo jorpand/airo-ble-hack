@@ -128,8 +128,10 @@ class FakeScanner:
 
 def install_fake_bleak() -> None:
     module = types.ModuleType("bleak")
-    setattr(module, "BleakClient", FakeClient)
-    setattr(module, "BleakScanner", FakeScanner)
+    # Se escriben en `__dict__` y no como atributos: ruff (B010) no quiere
+    # `setattr` y pyright no deja asignar atributos a un ModuleType.
+    module.__dict__["BleakClient"] = FakeClient
+    module.__dict__["BleakScanner"] = FakeScanner
     sys.modules["bleak"] = module
 
 
@@ -347,8 +349,10 @@ async def test_el_enlace_se_compueba_al_conectar() -> None:
             return False
 
     module = types.ModuleType("bleak")
-    setattr(module, "BleakClient", ClienteColgado)
-    setattr(module, "BleakScanner", FakeScanner)
+    # Se escriben en `__dict__` y no como atributos: ruff (B010) no quiere
+    # `setattr` y pyright no deja asignar atributos a un ModuleType.
+    module.__dict__["BleakClient"] = ClienteColgado
+    module.__dict__["BleakScanner"] = FakeScanner
     sys.modules["bleak"] = module
 
     robot = AiroRobot()

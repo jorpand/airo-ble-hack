@@ -41,7 +41,6 @@ from airo_ble.arms import (
 from airo_ble.protocol import Joint
 from airo_ble.session import RobotSession, Step
 
-
 # ---------------------------------------------------------------------------
 # 1. La duracion: cada accion dura al menos un segundo
 # ---------------------------------------------------------------------------
@@ -208,7 +207,7 @@ def test_los_dos_brazos_van_en_el_mismo_paquete() -> None:
     asyncio.run(sesion._mover_servos(objetivos, 0.0))
     assert len(espia.llamadas) == 4
     # los cuatro son del mismo paso: no hay dos comandos separados
-    assert len(set(j for j, _ in espia.llamadas)) == 4
+    assert len({j for j, _ in espia.llamadas}) == 4
 
 
 # ---------------------------------------------------------------------------

@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from airo_ble.protocol import (
     FIXED_TAIL,
+    IDX_LED,
     IDX_LEFT_DIR,
     IDX_LEFT_SPEED,
-    IDX_LED,
     IDX_RIGHT_DIR,
     IDX_RIGHT_SPEED,
     IDX_SERVO_1,

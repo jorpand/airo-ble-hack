@@ -93,6 +93,11 @@ filterwarnings = [
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+#: ruff **arregla**, no solo avisa: `ruff check` aplica las correcciones
+#: automaticas (los imports sin usar, los imports sin ordenar, la sintaxis
+#: vieja...). El hook de pre-commit tambien las aplica, asi que commitear
+#: deja el codigo limpio.
+fix = true
 # Carpetas que no son codigo nuestro (artefactos y material de reversing).
 extend-exclude = [
     ".venv-3.14",
@@ -101,10 +106,17 @@ extend-exclude = [
     "tools",
 ]
 
-# Solo se comprueban los errores que de verdad rompen el codigo (sintaxis y
-# nombres indefinidos). No se reformatea el repo: el estilo es el de siempre.
+# Las reglas de ruff. No se reformatea el repo a lo bruto: no esta el
+# formateador (black), solo las correcciones que se pueden hacer solas.
+#
+#   E, W   estilo (lineas largas, espacios...)
+#   F      pyflakes: imports y variables sin usar, errores de nombre
+#   I      imports ordenados
+#   UP     sintaxis moderna (python 3.11+)
+#   B      bugbear: errores que no son de sintaxis pero son bugs
+#   C4     comprehensiones
 [tool.ruff.lint]
-select = ["E9", "F63", "F7", "F82"]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
 
 [tool.pyright]
 #: La libreria (lo que se instala) y los tests. Los scripts de tools/ que

@@ -17,11 +17,12 @@ de web ni de interfaz).
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
-from .client import AiroNotFound, AiroRobot
-from .protocol import JOINT_NAMES, SERVO_CENTER, Joint, Led
+from .client import AiroRobot
+from .protocol import SERVO_CENTER, Joint, Led
 
 __all__ = [
     "RobotSession",
@@ -464,7 +465,11 @@ class RobotSession:
     def estado(self) -> dict[str, Any]:
         cmd = self.robot.command
         return {
-            "conectado": bool(self.conectado and self.robot._client and self.robot._client.is_connected),
+            "conectado": bool(
+                self.conectado
+                and self.robot._client
+                and self.robot._client.is_connected
+            ),
             "accion": self.accion_actual,
             "error": self.error,
             "luz": cmd.led.name.lower(),

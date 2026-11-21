@@ -11,7 +11,6 @@ Ejecutar: python3 -m pytest tests/test_api.py -v
 from __future__ import annotations
 
 import pytest
-
 from fastapi.testclient import TestClient
 
 from airo_ble.api.main import app

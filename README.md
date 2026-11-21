@@ -253,6 +253,7 @@ Todo el ciclo local pasa por **mise**. `mise tasks` lista las tareas:
 | `mise run test-py` / `test-web` | solo una de las dos suites |
 | `mise run types` | comprueba los tipos con **pyright** |
 | `mise run lint` | `ruff` + los hooks de pre-commit |
+| `mise run fix` | solo ruff, que **arregla** lo que puede |
 | `mise run web` | compila la interfaz (`npm ci` + `npm run build`) |
 | `mise run web-dev` | arranca Vite en el 5173 (para tocar la interfaz) |
 | `mise run web-gen` | regenera `web/src/servos.js` desde `protocol.py` |
@@ -284,8 +285,13 @@ mise run setup            # instala pre-commit
 pre-commit install        # se ejecuta antes de cada commit
 ```
 
-Revisan formato, sintaxis (ruff), **tipos** (pyright), ficheros grandes,
+Revisan formato, sintaxis (**ruff**), **tipos** (pyright), ficheros grandes,
 conflictos de merge y **secretos** (gitleaks).
+
+Ruff no solo avisa: **arregla**. Deja los imports ordenados, quita lo que no
+se usa y moderniza la sintaxis (las reglas están en `[tool.ruff.lint]` de
+`pyproject.toml`). Si un hook toca ficheros, el commit se para: los vuelves
+a anadir (`git add -u`) y ya está.
 
 Para colaborar, mira [`CONTRIBUTING.md`](CONTRIBUTING.md).
 

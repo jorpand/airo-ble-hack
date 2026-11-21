@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import asyncio
 
-from airo_ble.server import AiroService
 from airo_ble.protocol import Joint, Led
+from airo_ble.server import AiroService
 
 
 async def escenario() -> None:

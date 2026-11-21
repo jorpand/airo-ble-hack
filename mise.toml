@@ -47,13 +47,17 @@ run = "$AIRO_PYTHON -m pytest -q"
 description = "Pasa los tests de la interfaz"
 run = "cd {{config_root}}/web && npm test"
 
+[tasks.fix]
+description = "Ruff arregla el codigo (imports, sintaxis vieja, lo que sobra)"
+run = "$AIRO_PYTHON -m ruff check --fix ."
+
 [tasks.lint]
-description = "Ruff + los hooks de pre-commit"
+description = "Ruff + los hooks de pre-commit (ruff tambien arregla)"
 #: El hook que bloquea los commits en 'main' solo tiene sentido al commitear,
 #: no al revisar el repo entero.
 env = { SKIP = "no-commit-to-branch" }
 run = [
-  "$AIRO_PYTHON -m ruff check --select=E9,F63,F7,F82 .",
+  "$AIRO_PYTHON -m ruff check --fix .",
   "$AIRO_PYTHON -m pre_commit run --all-files",
 ]
 

@@ -275,7 +275,7 @@ class Command:
     #: angulo antes de enviarlo al servo.
     offsets: dict[Joint, float] = field(default_factory=dict)
 
-    def set_servo(self, joint: Joint, angle: float) -> "Command":
+    def set_servo(self, joint: Joint, angle: float) -> Command:
         """Fija el angulo pedido para una articulacion (grados de la app).
 
         El offset de calibracion se suma al **serializar**, igual que en la
@@ -287,11 +287,11 @@ class Command:
         self.servos[joint] = float(angle)
         return self
 
-    def set_joint(self, joint: Joint, angle: float) -> "Command":
+    def set_joint(self, joint: Joint, angle: float) -> Command:
         """Alias de `set_servo` (el offset se aplica al serializar)."""
         return self.set_servo(joint, angle)
 
-    def set_raw_servo(self, joint: Joint, value: int) -> "Command":
+    def set_raw_servo(self, joint: Joint, value: int) -> Command:
         """Manda un byte crudo en esa articulacion (para depurar)."""
         self.servos.pop(joint, None)
         self.raw_servos[joint] = int(value) & 0xFF
@@ -310,7 +310,7 @@ class Command:
             # igualmente (en la app el angulo esta siempre puesto)
             return encode_servo(joint, 0.0, offset, neutral)
         return SERVO_CENTER
-    def stop(self) -> "Command":
+    def stop(self) -> Command:
         """Para las ruedas sin tocar los servos (como hace `ResetStatus`)."""
         self.right_speed = 0.0
         self.left_speed = 0.0
@@ -339,7 +339,7 @@ class Command:
         # lo que deja el robot con `ResetStatus`. Ojo: si se dejaran a 0 el
         # firmware los llevaria al tope mecanico y el robot haria un gesto con
         # los brazos al conectar.
-        for joint, index in _JOINT_TO_INDEX.items():
+        for index in _JOINT_TO_INDEX.values():
             buf[index] = SERVO_CENTER
         for joint, index in _JOINT_TO_INDEX.items():
             if (

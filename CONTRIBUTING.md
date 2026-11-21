@@ -34,6 +34,7 @@ mise run web     # = cd web && npm ci && npm run build
 mise run test    # pytest + vitest
 mise run lint    # ruff + los hooks de pre-commit
 mise run types   # pyright
+mise run fix     # ruff arreglando lo que puede
 ```
 
 | Qué | Cuántos |
@@ -105,10 +106,21 @@ comentario que explique por que.
 ## Reglas de estilo
 
 - Comentarios y documentación **en español**, igual que el resto del repo.
-- Nada de reformateo masivo: el estilo actual es el que hay.
-- `ruff` solo comprueba errores que rompen el código (sintaxis, nombres
-  indefinidos). No se usa como formateador.
+- **Ruff arregla, no solo avisa.** Las reglas están en `[tool.ruff.lint]`
+  (`E`, `F`, `W`, `I`, `UP`, `B`, `C4`): imports ordenados, nada de imports
+  sin usar, sintaxis moderna para Python 3.11+ y los bugs que no son de
+  sintaxis. `ruff check` las aplica solo, así que casi nunca hay que
+  escribir nada a mano.
+- No hay formateador de estilo (nada de black): ruff **no** reordena el
+  código ni toca los comentarios. El estilo del repo es el que hay.
 - Si tocas el protocolo, actualiza la guía y añade el test que lo demuestra.
+
+### Cuando ruff y pyright se contradicen
+
+Ruff y pyright a veces piden cosas incompatibles (por ejemplo, ruff quiere
+`setattr(x, "a", v)` y pyright no deja asignar atributos a un `ModuleType`).
+Cuando pase, se resuelve **en esa linea**, con un comentario que explique el
+por qué. Lo ideal es que no haga falta.
 
 ## Reportar un problema
 

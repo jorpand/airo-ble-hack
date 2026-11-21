@@ -38,8 +38,8 @@ from airo_ble.protocol import (
     Joint,
     encode_servo,
 )
-from airo_ble.session import RobotSession
 from airo_ble.server import AiroService
+from airo_ble.session import RobotSession
 
 #: Byte del paquete de cada articulacion.
 #:

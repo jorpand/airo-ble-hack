@@ -22,14 +22,13 @@ import asyncio
 
 import pytest
 
-from airo_ble.client import AiroRobot
-from airo_ble.console import Console
-from airo_ble.session import RobotSession, Step
 from airo_ble.api.main import app, servicio
 from airo_ble.api.models import Programa
 from airo_ble.api.service import Traductor
+from airo_ble.client import AiroRobot
+from airo_ble.console import Console
 from airo_ble.server import AiroService
-
+from airo_ble.session import RobotSession, Step
 
 # ---------------------------------------------------------------------------
 # 1. El watchdog tiene que parar las ruedas

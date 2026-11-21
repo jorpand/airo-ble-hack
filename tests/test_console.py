@@ -15,9 +15,9 @@ import inspect
 from airo_ble.client import AiroRobot
 from airo_ble.console import Console, ConsoleError, resolve_joint
 from airo_ble.protocol import (
+    IDX_LED,
     IDX_LEFT_DIR,
     IDX_LEFT_SPEED,
-    IDX_LED,
     IDX_RIGHT_DIR,
     IDX_RIGHT_SPEED,
     IDX_SERVO_1,

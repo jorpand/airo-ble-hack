@@ -107,7 +107,7 @@ class AiroRobot:
 
     # -- ciclo de vida ---------------------------------------------------
 
-    async def __aenter__(self) -> "AiroRobot":
+    async def __aenter__(self) -> AiroRobot:
         await self.connect()
         return self
 
@@ -417,7 +417,7 @@ class AiroRobot:
                     ),
                     timeout=self.write_timeout,
                 )
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 raise AiroWriteError(
                     f"El robot no respondió en {self.write_timeout:g} s al "
                     "escribir. Su módulo BLE se duerme: apaga y enciende el "

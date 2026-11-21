@@ -21,7 +21,7 @@ import argparse
 import asyncio
 import sys
 
-from .protocol import JOINT_NAMES, Command, Joint, Led
+from .protocol import JOINT_NAMES, Command, Led
 
 
 async def cmd_scan(args: argparse.Namespace) -> int:

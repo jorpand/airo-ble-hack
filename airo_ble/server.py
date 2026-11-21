@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from airo_ble.arms import BrazoError, resolver_brazo, resolver_objetivos
-from airo_ble.client import AiroNotFound, AiroRobot
+from airo_ble.client import AiroRobot
 from airo_ble.console import load_calibration
 from airo_ble.protocol import JOINT_NAMES, SERVO_CENTER, Joint, Led
 
@@ -227,7 +227,7 @@ class AiroService:
         El candado serializa los movimientos: si llega otro antes de que
         termine este, espera a que el servo llegue.
         """
-        from airo_ble.arms import PASOS_POR_SEGUNDO, pasos_rampa, tiempo_de_viaje
+        from airo_ble.arms import tiempo_de_viaje
 
         if duracion > 0:
             # El movimiento lento espera a que termine el anterior (si no, se

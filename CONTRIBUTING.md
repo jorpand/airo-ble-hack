@@ -86,8 +86,8 @@ Está todo en el `.gitignore`, pero por si acaso:
 - `web/dist/`: es la build de Vite. Se regenera con `mise run web`.
 - `tools/rev/*.txt` y `*.tsv`: los volcados generados (~19 MB). Los scripts
   que los producen sí están.
-- `evidencia/`: las capturas y el material de trabajo del reversing. El
-  desensamblado que sí se publica está en `docs/desensamblado/`.
+- `evidencia/`: la carpeta de trabajo local, donde se capturan las pruebas.
+  Lo que sí se publica está en `docs/desensamblado/`.
 
 ## Los tipos
 

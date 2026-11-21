@@ -85,7 +85,7 @@ Este es el corazón del tema. La clase `RobotStatus` (en el código C# de la app
 > derecho" de la app es el hombro derecho de verdad (su `set_RightShoulderAngle`
 > llama a `SetFirstServoMotor`, el byte 6).
 >
-> Comprobado con el robot delante el 2026-11-10, con una foto porposeda: el
+> Comprobado con el robot delante el 2026-11-10, brazo por brazo: el
 > byte 6 levanta el brazo que está a la **derecha** del robot mirándolo de
 > frente (el robot enseña la cara: los dos ojos azules y el LED del pecho).
 > Antes esta tabla tenía los bytes 6/9 y 7/8 cambiados, y por eso
@@ -95,12 +95,10 @@ Este es el corazón del tema. La clase `RobotStatus` (en el código C# de la app
 >
 > Reverificado con el robot delante el **2026-11-10** por el camino público
 > (`session.brazo("derecho", "arriba")`): el paquete sale con los bytes 6=13 y
-> 7=0, y en la foto el brazo levantado es el de la **izquierda de la imagen**,
-> o sea el **derecho del robot** (que está mirando a cámara). Al revés para
-> `brazo izquierdo arriba` (bytes 8=40 y 9=23, brazo a la derecha de la
-> imagen). Las fotos de la comprobacion con el robot delante no se publican
-> aqui (son material local de trabajo), pero el desensamblado que lo demuestra
-> si: [`docs/desensamblado/`](desensamblado/).
+> 7=0, y el brazo que se levanta es el **derecho del robot** (que está
+> mirando a cámara). Al revés para `brazo izquierdo arriba` (bytes 8=40 y
+> 9=23). El desensamblado que lo demuestra está en
+> [`docs/desensamblado/`](desensamblado/).
 >
 > Ojo también con la **cola fija**: los bytes 10..19 que pone `SetFixedBytes` **no** son una rampa arbitraria, sino los **mismos valores que usan los servos**: `5, 22, 39, 56, 73, 90, 107, 124, 141, 158` es una progresión de **5 + 17k**. El `17` es el mismo divisor que usan los servos (§ 2.5). La rampa está ahí a propósito.
 
@@ -210,12 +208,11 @@ Ejemplos (sin offset, en **bytes**):
 > | hombro izquierdo | 9 | **7..23** | 0..6 y 24..40 |
 >
 > Comprobado en el robot el 2026-11-10 mandando bytes **crudos** al codo
-> derecho con el hombro arriba: los bytes 23, 30 y 40 dan imágenes
-> **indistinguibles** (la diferencia de píxeles entre ellas es ruido de
-> exposición), mientras que 0, 10 y 20 se ven claramente distintos.
-> El barrido (byte 0, 10, 20 y 23 del codo, de izquierda a derecha) se hizo
-> con el robot delante; las fotos no se publican, pero el script que lo midio
-> esta en [`tools/hardware/`](https://github.com/jorpand/airo-ble-hack/tree/main/tools/hardware).
+> derecho con el hombro arriba: los bytes 23, 30 y 40 dan el **mismo** resultado
+> (el codo ya está en su tope y no se mueve), mientras que 0, 10 y 20 se ven
+> claramente distintos. El barrido (byte 0, 10, 20 y 23 del codo) se hizo con
+> el robot delante; el script que lo midio esta en
+> [`tools/hardware/`](https://github.com/jorpand/airo-ble-hack/tree/main/tools/hardware).
 >
 > La app oficial nunca manda esos bytes: `encode_servo()` recorta el ángulo
 > **antes** de escalarlo, así que el byte que sale siempre cae dentro del
@@ -580,24 +577,23 @@ Dos medidas, con el robot real y la camara:
 | | De golpe | Lento (rampa de 4 s) |
 |---|---|---|
 | Bytes que salen | un solo salto: `13` | escalon a escalon: `20 19 19 19 18 18 ... 15 15 14 14 ... 13 13` |
-| Lo que ve la camara | **un** fotograma (0,8 s): todo el recorrido | **cinco** fotogramas seguidos (4 s): el brazo sube poco a poco |
+| Tiempo que tarda el brazo | **un** fotograma (0,8 s): todo el recorrido | **cinco** fotogramas seguidos (4 s): el brazo sube poco a poco |
 
-El "de golpe" se ve entero en la foto de las 17:36:59 y en la siguiente
-(17:37:08) el brazo ya no se ha movido. La rampa se mueve entre las 17:37:15
-y las 17:37:19, con el brazo a medio camino en las fotos intermedias.
+El "de golpe" se ve entero a las 17:36:59 y en la siguiente (17:37:08) el
+brazo ya no se ha movido. La rampa se mueve entre las 17:37:15 y las 17:37:19,
+con el brazo a medio camino en los intermedios.
 
 De la segunda medicion sale tambien la **velocidad real del servo**: el
 recorrido completo (170 grados del codo) se hace en **menos de un segundo**,
 asi que los 150 grados/s que usa el modelo (`arms.SERVO_VELOCIDAD`) son una
 estimacion prudente.
 
-Evidencia: las fotos del barrido (no se publican) y el script
-`tools/hardware/medida_final.py` (el que imprime las horas de reloj, para alinear
-las fotos con los comandos).
+Evidencia: el script `tools/hardware/medida_final.py` (el que imprime las
+horas de reloj, para alinear las medidas con los comandos).
 
 ### 8.1.2 La interfaz: bugs, móvil y control (2026-11-10, tarde)
 
-La interfaz se reviso entera con capturas reales (Chromium headless) y se
+La interfaz se reviso entera en un Chromium headless de verdad y se
 arreglaron cuatro cosas que estaban **claramente rotas**, mas un monton de
 comodidades para quien programa:
 

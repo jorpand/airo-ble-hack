@@ -216,8 +216,8 @@ fórmula fija que se equivocaba en hasta 230 grados en los codos.
 - `web/dist/`: la build de Vite. Se regenera con `mise run web`.
 - `tools/rev/*.txt` y `tools/rev/*.tsv`: los volcados generados del APK
   (~19 MB). Los scripts que los producen sí están.
-- `evidencia/`: las capturas y el material de trabajo del reversing. El
-  desensamblado que **sí** se publica está en [`docs/desensamblado/`](docs/desensamblado/).
+- `evidencia/`: la carpeta de trabajo local, donde se capturan las pruebas.
+  Lo que **sí** se publica está en [`docs/desensamblado/`](docs/desensamblado/).
 - Entornos virtuales, `node_modules/` y caches de herramientas.
 
 ## Tests

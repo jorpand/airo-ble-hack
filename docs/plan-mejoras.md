@@ -147,7 +147,7 @@ boton de ejemplo y duracion estimada) y publico "ninos mayores (10+)": se
 mantienen las palabras tecnicas (angulos, articulacion) y se anaden atajos de
 teclado.
 
-### Los cuatro bugs (todos confirmados con capturas)
+### Los cuatro bugs (todos confirmados en el navegador)
 
 | # | Bug | Arreglo |
 |---|---|---|
@@ -169,11 +169,8 @@ teclado.
 
 ### Evidencia
 
-`evidencia/interfaz/` (local, no se publica): `antes_escritorio_1440.png`,
-`antes_tablet_820.png`,
-`antes_movil_390.png` (los bugs) y `despues_*.png` (despues). El script
-`tools/hardware/capturar_interfaz.py` no solo saca las capturas: **comprueba el
-arrastrar y soltar de verdad** con el navegador (Playwright) y escribe lo que
+El script `tools/hardware/capturar_interfaz.py` **comprueba el arrastrar y
+soltar de verdad** con el navegador (Playwright) y escribe lo que
 ha pasado en un JSON.
 
 Comprobado con el navegador (Chromium headless, 2026-11-10):
@@ -252,7 +249,7 @@ Decisiones que se tomaron al implementarlo:
 
 ### Verificado en el robot (2026-11-10, 17:36-17:40)
 
-Con el robot delante de la camara y las fotos alineadas por hora de reloj:
+Con el robot delante de la camara y las medidas alineadas por hora de reloj:
 
 | | De golpe | Lento (rampa de 4 s) |
 |---|---|---|
@@ -263,8 +260,7 @@ Ademas: el recorrido completo (170 grados del codo) se hace en **menos de un
 segundo**, asi que los 150 grados/s del modelo (`arms.SERVO_VELOCIDAD`) son
 prudentes.
 
-Evidencia: las fotos del barrido (no se publican);
-scripts: `tools/hardware/medida_final.py`, `tools/hardware/verificar_rampa.py`,
+Evidencia: `tools/hardware/medida_final.py`, `tools/hardware/verificar_rampa.py`,
 `tools/hardware/comparar_lento_vs_golpe.py`.
 
 ### Lo que falta
@@ -289,8 +285,8 @@ brazo **izquierdo** del robot.
    ordenador. Se ve su **cara** (la pantalla oscura con los dos ojos azules) y
    el **LED del pecho**, que se enciende con el byte 1 del paquete: o sea que
    el robot **mira a la cámara**. Mirándolo de frente, su brazo derecho es el
-   de la **izquierda** de la imagen. Y el byte 6 levanta **precisamente** ese
-   brazo (el de la izquierda de la imagen).
+   que queda a la **izquierda** de quien lo mira. Y el byte 6 levanta
+   **precisamente** ese brazo.
 2. **El desensamblado.** `docs/desensamblado/AiroControl_set_RightShoulderAngle.asm`:
    el "hombro derecho" de la app llama a `SetFirstServoMotor` → **byte 6**.
    Los hombros y los codos de la app **no** están cruzados con los del robot.
@@ -328,13 +324,13 @@ Con el robot otra vez delante de la cámara se hizo la comprobación **por el
 camino público** (lo que ve el usuario cuando dice "brazo derecho arriba"), con
 el paquete **interceptado** para ver los bytes que salen de verdad:
 
-| Orden | Bytes que salen | Foto | ¿Qué brazo sube? |
-|---|---|---|---|
-| `brazo derecho arriba` | 6=`0x0d` (13), 7=`0x00` (0) | foto con el robot delante (local) | el de la **izquierda de la imagen** = el **derecho del robot** |
-| `brazo izquierdo arriba` | 8=`0x28` (40), 9=`0x17` (23) | foto con el robot delante (local) | el de la **derecha de la imagen** = el **izquierdo del robot** |
+| Orden | Bytes que salen | ¿Qué brazo sube? |
+|---|---|---|
+| `brazo derecho arriba` | 6=`0x0d` (13), 7=`0x00` (0) | el **derecho del robot** (el de la izquierda de quien lo mira) |
+| `brazo izquierdo arriba` | 8=`0x28` (40), 9=`0x17` (23) | el **izquierdo del robot** |
 
-El robot enseña la cara (visor turquesa) en las dos fotos, así que el lado se
-lee sin ambigüedad. **El fix queda verificado en el hardware.**
+El robot enseña la cara (visor turquesa), así que el lado se lee sin
+ambigüedad. **El fix queda verificado en el hardware.**
 
 Las 5 poses de la app se comprobaron igual contra el robot y coinciden
 **exactamente** con la tabla de la guía:
@@ -349,9 +345,8 @@ guardia  -> hombroDer=13  codoDer=09  codoIzq=31  hombroIzq=23
 
 ### Hallazgo nuevo: el codo solo usa el tramo 0..23 (y 17..40 en el otro lado)
 
-Mandando bytes **crudos** al codo derecho con el hombro arriba y comparando
-las fotos pixel a pixel, los bytes **23, 30 y 40 dan imágenes
-indistinguibles** (la diferencia entre ellas es ruido de exposición), mientras
+Mandando bytes **crudos** al codo derecho con el hombro arriba, los bytes
+**23, 30 y 40 dan el mismo resultado** (el codo ya está en su tope), mientras
 que 0, 10 y 20 se ven claramente distintos:
 
 | Byte del codo | Rango con efecto | Fuera no se mueve |
@@ -368,11 +363,11 @@ escalar), así que no es un bug: solo importa si se mandan bytes a pelo con
 
 La **geometría visual** exacta (con qué ángulo se ve el antebrazo para un byte
 dado del codo, y con qué ángulo real gira el hombro) no se ha podido cerrar:
-la escena estaba a contraluz y las piezas del brazo miden 30-60 px en la
-foto. Las medidas sobre las fotos dan un **desvío constante de ~30°** en el
-codo (el antebrazo real no queda alineado con el brazo superior ni en el
-"recto" de la app) y sugieren que el hombro llega a "colgado" antes del
-ángulo +77 de la app, pero con ±20-30° de margen.
+la escena estaba a contraluz y las piezas del brazo medían 30-60 px en
+pantalla. Las medidas dan un **desvío constante de ~30°** en el codo (el
+antebrazo real no queda alineado con el brazo superior ni en el "recto" de la
+app) y sugieren que el hombro llega a "colgado" antes del ángulo +77 de la
+app, pero con ±20-30° de margen.
 
 **No se ha tocado el dibujo de la web** por eso: hoy implementa el modelo de
 ángulos de la app oficial (que es la mejor referencia disponible) y cambiarlo
@@ -933,8 +928,8 @@ Prioridad: **P0** = seguridad / el robot se mueve solo · **P1** = funcional rot
 | 2.7 | Bloque "ambos" en la UI web | `api/models.py:49-54` permite `"ambos"`; la ruta underlying ya funciona. Añadido test de integración bloque→robot. | ✅ Hecho |
 | 2.8 | **Renombrar el enum `Joint` según la guía** | Byte 6 = hombro **izquierdo**, 7 = brazo izquierdo, 8 = brazo derecho, 9 = hombro derecho (según la tabla de la guía). | ⚠️ **Hecho, pero DESHECHO por la 2.9**: la tabla de la guía tenía el byte 6 y el 9 cambiados. |
 | 2.9 | **Corregir el lado físico de los brazos con el robot delante** | La guía decía que el byte 6 era el hombro **izquierdo**; con el robot en la mesa y una cámara se vio que es el **derecho** (el robot enseña la cara: ojos y LED del pecho). Consecuencia: "brazo derecho" movía el brazo **izquierdo** del robot. | ✅ **Hecho**: `Joint.RIGHT_SHOULDER` = byte 6 y `Joint.LEFT_SHOULDER` = byte 9 (y los codos igual). **Los bytes no se han movido**: el mapa byte → (signo, límites) sigue 6:+, 7:−, 8:+, 9:− y el conjunto de 4 bytes de cada pose es idéntico. `calibration.json` se re-mapeó (el cero en 16 se queda en el byte 9, ahora `left_shoulder`). La guía y el README están corregidos. |
-| 2.10 | **Documentar el rango real de bytes del codo** | Mandando bytes crudos al codo, los bytes 23/30/40 dan imágenes indistinguibles: el codo derecho solo usa 0..23 y el izquierdo 17..40. Consecuencia de los límites (−25..170) con la escala de 8,5°/byte. La app nunca manda los bytes inútiles (recorta el ángulo antes de escalar), así que no es un bug. | ✅ **Hecho**: documentado en `docs/protocolo.md` § 2.5 con la evidencia (el barrido con el robot delante; las fotos no se publican). |
-| 2.11 | **Geometría visual real del hombro y del codo** | Con qué ángulo se ve de verdad el antebrazo para un byte dado del codo, y con qué ángulo real gira el hombro. Las fotos dan un desvío constante de ~30° en el codo y sugieren que el hombro cuelga antes del +77 de la app, pero con ±20-30° de margen (escena a contraluz, piezas de 30-60 px). | ⬜ **Abierta**: el dibujo de la web sigue el modelo de ángulos de la app oficial. No se cambia con una medición dudosa. Pendiente de repetir con luz y el robot más cerca. |
+| 2.10 | **Documentar el rango real de bytes del codo** | Mandando bytes crudos al codo, los bytes 23/30/40 dan imágenes indistinguibles: el codo derecho solo usa 0..23 y el izquierdo 17..40. Consecuencia de los límites (−25..170) con la escala de 8,5°/byte. La app nunca manda los bytes inútiles (recorta el ángulo antes de escalar), así que no es un bug. | ✅ **Hecho**: documentado en `docs/protocolo.md` § 2.5 con la evidencia (el barrido con el robot delante). |
+| 2.11 | **Geometría visual real del hombro y del codo** | Con qué ángulo se ve de verdad el antebrazo para un byte dado del codo, y con qué ángulo real gira el hombro. Las mediciones dan un desvío constante de ~30° en el codo y sugieren que el hombro cuelga antes del +77 de la app, pero con ±20-30° de margen (escena a contraluz, piezas de 30-60 px). | ⬜ **Abierta**: el dibujo de la web sigue el modelo de ángulos de la app oficial. No se cambia con una medición dudosa. Pendiente de repetir con luz y el robot más cerca. |
 
 ### FASE 2-bis — Lo que apareció al implementarla
 

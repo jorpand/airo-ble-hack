@@ -98,7 +98,8 @@ tools/rev/*.tsv
 tools/rev/*.bin
 tools/rev/*.dex
 
-# Evidencia del reversing y capturas: material de trabajo, no fuente.
+# La carpeta de trabajo local: aqui se capturan las pruebas y se dejan los
+# volcados. Lo que se publica vive en docs/.
 evidencia/
 
 # Bases de datos y ficheros generados en general

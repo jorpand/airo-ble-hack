@@ -24,24 +24,23 @@ Las direcciones son RVAs del binario; el `Offset` de fichero es RVA - 0x4000.
 | `AiroControl_set_LeftArmAngle.asm` | `AiroControl.set_LeftArmAngle` | brazo izquierdo -> SetThirdServoMotor |
 | `AiroControl_set_LeftShoulderAngle.asm` | `AiroControl.set_LeftShoulderAngle` | hombro izquierdo -> SetFourthServoMotor |
 
-## Fotos del robot (2026-11-10)
+## El robot real (2026-11-10)
 
-Estas no son desensamblado: son el **robot real** delante de la cámara, para
-desempatar los dos lados de los brazos.
+Esto no es desensamblado: es la comprobacion con el **robot delante de la
+camara**, para desempatar los dos lados de los brazos.
 
-| Fichero | Qué demuestra |
+| Comprobacion | Qué demuestra |
 |---|---|
-| `hardware_verif_brazo_derecho_arriba.jpg` | `session.brazo("derecho", "arriba")` (bytes 6=13, 7=0) levanta el brazo de la **izquierda de la imagen**. El robot enseña la cara → ese es su brazo **derecho**. |
-| `hardware_verif_brazo_izquierdo_arriba.jpg` | `session.brazo("izquierdo", "arriba")` (bytes 8=40, 9=23) levanta el brazo de la **derecha de la imagen** = el **izquierdo** del robot. |
-| `hardware_verif_lado_izq_der.png` | Las dos fotos de arriba, lado a lado. |
-| `hardware_barrido_codo_derecho.png` | Barrido del **codo derecho** (byte 7 = 0, 10, 20, 23) con el hombro arriba. Los bytes 23, 30 y 40 dan imágenes indistinguibles: el codo solo usa el tramo 0..23. |
+| `session.brazo("derecho", "arriba")` (bytes 6=13, 7=0) | levanta el brazo **derecho** del robot (el que está a su derecha mirándolo de frente, con la cara vista). |
+| `session.brazo("izquierdo", "arriba")` (bytes 8=40, 9=23) | levanta el brazo **izquierdo** del robot. |
+| Barrido del **codo derecho** (byte 7 = 0, 10, 20, 23) con el hombro arriba | los bytes 23, 30 y 40 dan el mismo resultado (el codo ya está en su tope): el codo solo usa el tramo 0..23. |
 
-Todas con el robot mirando a cámara y con las ruedas paradas (los bytes 2-5 a 0).
+En todas, el robot mirando a cámara y con las ruedas paradas (los bytes 2-5 a 0).
 
 ## El modelo de acciones (2026-11-10, tarde)
 
-Esto **no** son fotos: es la traza de los bytes que salen por el BLE con el
-modelo de acciones nuevo (movimiento lento en rampa, alcance y paralelismo).
+Esto es la traza de los bytes que salen por el BLE con el modelo de acciones
+nuevo (movimiento lento en rampa, alcance y paralelismo).
 Se obtuvo con un espia sobre `Command.set_joint`, es decir, es exactamente lo
 que se manda al robot.
 
@@ -63,52 +62,47 @@ cycle*: el HM-10 se duerme a los ~5 min y tarda ~40 s en anunciarse).
 
 ## El movimiento lento, comprobado en el robot (2026-11-10, 17:36-17:40)
 
-Con el robot delante de la camara (`/dev/video0`) y las fotos alineadas por
-hora de reloj con los comandos (`evidencia/medida_final.py`):
+Con el robot delante de la camara (`/dev/video0`) y las medidas alineadas por
+hora de reloj con los comandos (`tools/hardware/medida_final.py`):
 
 | | De golpe | Lento (rampa de 4 s) |
 |---|---|---|
 | Bytes por BLE | un solo salto (`13`) | `20 19 19 19 18 18 ... 15 15 14 14 ... 13 13` |
 | Movimiento en la camara | **1** fotograma (0,8 s), a las 17:36:59 | **5** fotogramas seguidos, de las 17:37:15 a las 17:37:19 |
 
-En el caso lento el brazo esta **a medio camino** en las fotos intermedias:
-eso es la rampa, no un salto con una espera detras.
+En el caso lento el brazo esta **a medio camino** en los intermedios: eso es
+la rampa, no un salto con una espera detras.
 
 Ademas, el recorrido completo (170 grados del codo) se hace en menos de un
 segundo, asi que la velocidad de 150 grados/s que usa el modelo es prudente.
 
-| Fichero | Que demuestra |
+| Script | Que demuestra |
 |---|---|
-| `hardware_rampa_vs_golpe.png` | la tira: las tres primeras son el "de golpe", las cinco ultimas la rampa |
-| `hardware_rampa_inicio_golpe.jpg` | el brazo en el fotograma del salto |
-| `hardware_rampa_inicio_lento.jpg` | el brazo en el primer fotograma de la rampa |
-| `medida_final.py` | el script que hace la prueba e imprime las horas para alinear |
-| `verificar_rampa.py` | el script que solo mira los bytes que salen por BLE |
-| `comparar_lento_vs_golpe.py` | la version que compara las dos formas en una sola sesion |
-| `medir_velocidad_servo.py` | mide cuanto tarda el servo en llegar de verdad |
+| `tools/hardware/medida_final.py` | el que hace la prueba e imprime las horas para alinear |
+| `tools/hardware/verificar_rampa.py` | el que solo mira los bytes que salen por BLE |
+| `tools/hardware/comparar_lento_vs_golpe.py` | la version que compara las dos formas en una sola sesion |
+| `tools/hardware/medir_velocidad_servo.py` | mide cuanto tarda el servo en llegar de verdad |
 
 
 ## La interfaz grafica (2026-11-10, tarde)
 
-Capturas reales de la interfaz (Chromium headless, sin mocks) antes y
-despues de los arreglos. Las de "antes" son del mismo día, antes de tocar
-nada.
+La interfaz se reviso en un Chromium headless de verdad (sin mocks) antes y
+despues de los arreglos. Lo que se vio:
 
-| Fichero | Que se ve |
+| Vista | Que se ve |
 |---|---|
-| `interfaz/antes_escritorio_1440.png` | los brazos del robot **salidos de la tarjeta** (a la izquierda y a la derecha del todo) |
-| `interfaz/antes_tablet_820.png` | la paleta comiendose la pantalla entera |
-| `interfaz/antes_movil_390.png` | la cabecera rota: el boton "Conectar" fuera de la pantalla y el chip "avanzado" cortado |
-| `interfaz/antes_bloques.png` | los botones ▲▼✕ **encima del deslizador** y el deslizador como barra negra |
-| `interfaz/despues_escritorio_ejemplo.png` | escritorio: botones en la cabecera del bloque, deslizador legible, duracion por bloque y el robot dentro de su tarjeta |
-| `interfaz/despues_tablet.png` | tablet: paleta en rejilla de 5 columnas, cabecera en una fila |
-| `interfaz/despues_movil.png` / `despues_movil_ejemplo.png` | movil: cabecera en dos filas, paleta en dos columnas, bloques con deslizador y duracion |
-| `interfaz/despues_movil_bloque.png` | el bloque del brazo en el movil, con el deslizador y los botones en su sitio |
-| `interfaz/despues_escritorio_arrastre.png` | el programa con un bloque arrastrado desde la paleta |
+| Escritorio | los brazos del robot **salidos de la tarjeta** (a la izquierda y a la derecha del todo) |
+| Tablet | la paleta comiendose la pantalla entera |
+| Movil | la cabecera rota: el boton "Conectar" fuera de la pantalla y el chip "avanzado" cortado |
+| Bloque | los botones ▲▼✕ **encima del deslizador** y el deslizador como barra negra |
+| Escritorio, despues | botones en la cabecera del bloque, deslizador legible, duracion por bloque y el robot dentro de su tarjeta |
+| Tablet, despues | paleta en rejilla de 5 columnas, cabecera en una fila |
+| Movil, despues | cabecera en dos filas, paleta en dos columnas, bloques con deslizador y duracion |
+| Movil, bloque del brazo | con el deslizador y los botones en su sitio |
+| Arrastre | el programa con un bloque arrastrado desde la paleta |
 
-El script `capturar_interfaz.py` (en `evidencia/`) no solo saca las
-capturas: **comprueba el arrastrar y soltar de verdad** con Playwright y
-devuelve un JSON con lo que ha pasado:
+El script `tools/hardware/capturar_interfaz.py` **comprueba el arrastrar y
+soltar de verdad** con Playwright y devuelve un JSON con lo que ha pasado:
 
 ```json
 {
@@ -121,8 +115,8 @@ devuelve un JSON con lo que ha pasado:
 }
 ```
 
-Ejecutar: `.venv-3.14/bin/python evidencia/capturar_interfaz.py` (con la API
-levantada en el puerto 8100).
+Ejecutar: `mise run setup` y luego `.venv/bin/python tools/hardware/capturar_interfaz.py`
+(con la API levantada en el puerto 8100).
 
 Nota: el arrastre necesita que el origen y el destino esten **a la vez en
 pantalla**. Si el bloque de la paleta queda fuera de la vista, el navegador
@@ -154,15 +148,14 @@ El guardado va al **servidor**: un archivo JSON en `~/.airo/guardado.json`
 (variable `AIRO_GUARDADO` para cambiarlo). Es un archivo con dos listas,
 `programas` y `funciones`.
 
-| Fichero | Que demuestra |
-|---|---|
-| `interfaz/despues_escritorio_guardado.png` | la columna "4 · Guardado" a la derecha, con el programa guardado y la funcion "Saludo" |
-| `interfaz/despues_escritorio_marcando.png` | dos bloques marcados (clic y Mayusculas) con el contorno oscuro |
-| `interfaz/despues_marcar_bloques.png` | la barra "2 bloques marcados" con el nombre y "Guardar como funcion" |
-| `interfaz/despues_portatil_guardado_abajo.png` | en un portatil de 1440 la columna se pasa abajo y "Programas" y "Funciones" quedan en dos columnas |
-| `probar_guardado.py` | la prueba de punta a punta en el navegador (Playwright) |
+| Que se ve |
+|---|
+| la columna "4 · Guardado" a la derecha, con el programa guardado y la funcion "Saludo" |
+| dos bloques marcados (clic y Mayusculas) con el contorno oscuro |
+| la barra "2 bloques marcados" con el nombre y "Guardar como funcion" |
+| en un portatil de 1440 la columna se pasa abajo y "Programas" y "Funciones" quedan en dos columnas |
 
-La prueba (`evidencia/probar_guardado.py`, con la API levantada en el 8100):
+La prueba (`tools/hardware/probar_guardado.py`, con la API levantada en el 8100):
 
 ```json
 {
@@ -204,12 +197,9 @@ bloque dentro de un "repetir" que estaba dentro de otro, no se insertaba
 nada, porque `insertarEnArbol` solo buscaba el "repetir" destino en el primer
 nivel del arbol.
 
-| Fichero | Que demuestra |
-|---|---|
-| `interfaz/despues_repetir_anidado.png` | "Repite 3" > "Repite 2" > "Espera 1 s", con "⏱ dura unos 6 s" |
-| `probar_repetir.py` | la prueba en el navegador (Playwright) |
-
-La prueba, antes y despues del arreglo:
+La prueba en el navegador (`tools/hardware/probar_repetir.py`) muestra un
+"Repite 3" > "Repite 2" > "Espera 1 s", con "⏱ dura unos 6 s". Antes y
+despues del arreglo:
 
 | Prueba | Antes | Ahora |
 |---|---|---|

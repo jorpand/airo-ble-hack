@@ -108,6 +108,15 @@ button {
   background: var(--rojo);
 }
 
+/* El distintivo de que se habla con el robot a traves del puente. */
+.estado-puente {
+  background: #e0e7ff;
+  color: #312e81;
+}
+.estado-puente .punto {
+  background: #6366f1;
+}
+
 @keyframes latido {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.35); }

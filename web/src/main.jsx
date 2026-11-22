@@ -764,6 +764,9 @@ export default function App() {
   }, [bloques, funcionesPayload]);
 
   const conectado = estado?.conectado ?? false;
+  // Si se habla con el robot a traves del puente del ESP32-S3, su URL. Se
+  // enseña en la cabecera para saber de un vistazo por donde van las cosas.
+  const puente = estado?.puente ?? null;
 
   // --- cambiar el programa (todo pasa por aqui, para que se pueda deshacer)
 
@@ -1147,6 +1150,15 @@ export default function App() {
             <span className="punto" />
             {conectado ? 'Robot conectado' : 'Robot sin conexión'}
           </div>
+          {puente && (
+            <div
+              className="estado estado-puente"
+              title={`El robot se controla a través del puente ${puente}`}
+            >
+              <span className="punto" />
+              vía ESP32
+            </div>
+          )}
         </div>
         <div className="cabecera-fila cabecera-controles">
           <div className="modo-caja">

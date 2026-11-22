@@ -2,7 +2,7 @@
  * Extension de Scratch 3 para el robot Clementoni AIRO.
  *
  * Los bloques no hablan BLE (el navegador no puede): llaman a un servidor
- * local en Python (`airo_server.py`) que se encarga.
+ * local en Python (`python3 -m airo_ble.server`) que se encarga.
  *
  * Como cargarlo en TurboWarp:
  *   Editar -> Custom Extension -> Extension URL (o pegar este fichero).
@@ -219,43 +219,46 @@ class AIRO extends Scratch3Extension {
 
     // --- bloques ---
 
-    moveForward(speed) {
-        this.send({type: 'move', left: speed, right: speed});
+    async moveForward(speed) {
+        await this.send({type: 'move', left: speed, right: speed});
     }
 
-    moveBackward(speed) {
-        this.send({type: 'move', left: -speed, right: -speed});
+    async moveBackward(speed) {
+        await this.send({type: 'move', left: -speed, right: -speed});
     }
 
-    turnLeft(speed) {
-        this.send({type: 'move', left: speed, right: -speed});
+    async turnLeft(speed) {
+        await this.send({type: 'move', left: speed, right: -speed});
     }
 
-    turnRight(speed) {
-        this.send({type: 'move', left: -speed, right: speed});
+    async turnRight(speed) {
+        await this.send({type: 'move', left: -speed, right: speed});
     }
 
-    stop() {
-        this.send({type: 'stop'});
+    async stop() {
+        await this.send({type: 'stop'});
     }
 
     wait(seconds) {
         return new Promise(resolve => setTimeout(resolve, seconds * 1000));
     }
 
-    setLed(mode) {
-        this.send({type: 'led', mode: mode});
+    async setLed(mode) {
+        await this.send({type: 'led', mode: mode});
     }
 
-    setArm(side, pose) {
-        this.send({type: 'arm', side: side, pose: pose});
+    async setArm(side, pose) {
+        await this.send({type: 'arm', side: side, pose: pose});
     }
 
     // Mueve una articulacion del brazo a un angulo exacto. Con "secs" a 0
     // va de golpe; con un tiempo, el movimiento es lento (el destino va
     // viajando hasta el servo).
-    setArmJoint(side, joint, angle, secs) {
-        this.send({
+    //
+    // OJO: el orden de los parametros es el de los argumentos del bloque
+    // (JOINT, SIDE, ANGLE, SECS): Scratch los pasa en ese orden.
+    async setArmJoint(joint, side, angle, secs) {
+        await this.send({
             type: 'arm',
             side: side,
             joint: joint,
@@ -264,16 +267,16 @@ class AIRO extends Scratch3Extension {
         });
     }
 
-    setJoint(joint, angle) {
-        this.send({type: 'pose', joint: joint, angle: angle});
+    async setJoint(joint, angle) {
+        await this.send({type: 'pose', joint: joint, angle: angle});
     }
 
-    kata() {
-        this.send({type: 'kata'});
+    async kata() {
+        await this.send({type: 'kata'});
     }
 
-    reset() {
-        this.send({type: 'reset'});
+    async reset() {
+        await this.send({type: 'reset'});
     }
 
     async status() {

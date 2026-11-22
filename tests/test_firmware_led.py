@@ -285,3 +285,27 @@ async def test_un_cuerpo_vacio_no_hace_parpadear(puente: Any, http_srv: Any) -> 
     codigo, _datos = await p.r_escribir(peticion)
     assert codigo == 400
     assert p.led.destellos == 0
+
+
+async def test_el_latido_no_hace_parpadear(puente: Any, http_srv: Any) -> None:
+    """El mismo paquete otra vez (el latido de seguridad) no parpadea.
+
+    El cliente manda el mismo paquete cada segundo por si la placa se ha
+    reiniciado. Si eso hiciese parpadear el LED, este parpadearia sin
+    parar y no diria nada del estado.
+    """
+    p = puente.Puente(indicador=LedFalso())
+    peticion = http_srv.Peticion("POST", "/escribir", {}, b"\xa5\x00")
+    await p.r_escribir(peticion)
+    await p.r_escribir(peticion)
+    assert p.led.parpadeos == 1
+
+
+async def test_un_paquete_nuevo_sigue_haciendo_parpadear(
+    puente: Any, http_srv: Any
+) -> None:
+    """Un comando que cambia el paquete vuelve a hacer parpadear el LED."""
+    p = puente.Puente(indicador=LedFalso())
+    await p.r_escribir(http_srv.Peticion("POST", "/escribir", {}, b"\xa5\x00"))
+    await p.r_escribir(http_srv.Peticion("POST", "/escribir", {}, b"\xa5\x01"))
+    assert p.led.parpadeos == 2

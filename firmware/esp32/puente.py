@@ -76,6 +76,9 @@ class Puente:
         self.led = indicador if indicador is not None else led.Led()
         #: Si se esta buscando al robot (el LED esta en azul).
         self.buscando = False
+        #: El ultimo paquete que llego por HTTP (para distinguir el trafico
+        #: de verdad del latido de seguridad).
+        self.ultimo_paquete = b""
         self.actualizar_led()
 
     # -- El LED ------------------------------------------------------------
@@ -146,7 +149,14 @@ class Puente:
             return 400, {"error": "cuerpo vacio"}
         # Hay trafico de comandos (se han leido del HTTP y se mandan al
         # robot): el LED parpadea del color que tenga.
-        self.parpadear()
+        #
+        # OJO: el cliente manda un latido de seguridad (el mismo paquete
+        # cada segundo, por si la placa se ha reiniciado). Ese latido no es
+        # un comando nuevo: si hiciese parpadear el LED, este parpadearia
+        # sin parar y no diria nada del estado.
+        if datos != self.ultimo_paquete:
+            self.ultimo_paquete = bytes(datos)
+            self.parpadear()
         ok = await self.cliente.escribir(datos)
         if not ok:
             return 409, {"error": self.cliente.error or "no se pudo escribir"}

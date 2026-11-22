@@ -7,20 +7,19 @@ Controlar el robot Clementoni AIRO desde Scratch (o TurboWarp).
 El navegador no puede hablar BLE con el robot, asi que hay dos piezas:
 
 ```
-  Scratch (navegador)  --HTTP-->  airo_server.py  --BLE-->  AIRO
-      bloques JS                        Python
+  Scratch (navegador)  --HTTP-->  airo_ble.server  --BLE-->  AIRO
+      bloques JS                         Python
 ```
 
 - `airo.js` — la extension de Scratch 3 (los bloques).
-- `../airo_server.py` — el servidor local: habla BLE con el robot y mantiene
-  la conexion viva (el firmware devuelve los brazos al reposo si deja de
-  recibir paquetes).
+- `../server.py` — el servidor local (`python3 -m airo_ble.server`): habla con
+  el robot y mantiene la conexion viva (el firmware devuelve los brazos al
+  reposo si deja de recibir paquetes).
 - `test.html` — una pagina con botones para probar el servidor sin Scratch.
 
 ## Arrancar
 
 ```bash
-cd airo
 python3 -m airo_ble.server
 ```
 
@@ -55,6 +54,22 @@ http://localhost:8766/scratch3_airo/airo.js
 **Ojo**: solo puede haber un cliente BLE conectado al robot. Si la API web
 (la de `http://localhost:8100`) esta conectada, el puente de Scratch no
 podra conectarse al robot: para usar uno u otro, para el otro.
+
+### Con el puente del ESP32-S3
+
+El servidor de Scratch tambien funciona **a traves del puente** del ESP32-S3
+(el chip que esta al lado del robot). Con `AIRO_BRIDGE_URL` puesta, el
+servidor habla con la placa por HTTP en vez de por Bluetooth, y el portable
+no necesita radio:
+
+```bash
+export AIRO_BRIDGE_URL=http://192.168.1.147:8080
+python3 -m airo_ble.server
+```
+
+El LED RGB de la placa dice en que estado esta el enlace (rojo: nada
+conectado, azul: buscando, verde: conectado) y parpadea cuando llegan
+comandos.
 
 ## Cargar los bloques
 
@@ -102,7 +117,10 @@ cuando se pulse la bandera verde
 ## Notas
 
 - El servidor escucha solo en `127.0.0.1` (no es accesible desde la red).
-- La extension se comunica con `http://localhost:8765`; si cambias el puerto
-  del servidor, cambialo tambien en `airo.js` (constante `API`).
+- La extension busca sola el puerto del servidor (8765, 8766, 8767, 8768) y
+  se queda con el primero que conteste con el estado del AIRO: **no hay que
+  tocar `airo.js` para cambiar de puerto**.
 - Scratch y el servidor tienen que estar en el mismo equipo (localhost).
 - La velocidad va de 1 a 3 (el robot solo tiene tres niveles).
+- Los bloques de accion **esperan** a que el servidor conteste, asi que el
+  orden de los bloques es el orden en que llegan los comandos.

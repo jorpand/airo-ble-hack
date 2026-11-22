@@ -45,11 +45,40 @@
 <pre id="salida"></pre>
 
 <script>
-const API = 'http://localhost:8765';
+// Igual que la extension: se prueban varios puertos y se usa el primero
+// que conteste con NUESTRO estado (otro programa puede contestar un 200 en
+// /api/status sin ser el nuestro).
+const PUERTOS = [8765, 8766, 8767, 8768];
+let api = null;
+
+async function puente() {
+  if (api) return api;
+  for (const puerto of PUERTOS) {
+    const base = 'http://localhost:' + puerto;
+    try {
+      const r = await fetch(base + '/api/status');
+      if (!r.ok) continue;
+      const s = await r.json();
+      if (s && s.brazos && s.izquierda !== undefined) {
+        api = base;
+        return api;
+      }
+    } catch (e) {
+      // este puerto no contesta: se prueba el siguiente
+    }
+  }
+  return null;
+}
 
 async function mover(tipo, extra) {
+  const base = await puente();
+  if (!base) {
+    document.getElementById('salida').textContent =
+      'No se encuentra el servidor local. ¿Has arrancado "python3 -m airo_ble.server"?';
+    return;
+  }
   const cmd = Object.assign({type: tipo}, extra);
-  const r = await fetch(API + '/api/command', {
+  const r = await fetch(base + '/api/command', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(cmd)
@@ -61,15 +90,21 @@ async function mover(tipo, extra) {
 }
 
 async function actualizar() {
+  const base = await puente();
+  if (!base) {
+    document.getElementById('estado').textContent =
+      'El servidor no responde. ¿Has arrancado "python3 -m airo_ble.server"?';
+    return;
+  }
   try {
-    const r = await fetch(API + '/api/status');
+    const r = await fetch(base + '/api/status');
     const s = await r.json();
     document.getElementById('estado').textContent = s.conectado
       ? 'Robot conectado | luz: ' + s.led + ' | ruedas: ' + s.izquierda + ' / ' + s.derecha
       : 'Sin conexion con el robot';
   } catch (e) {
     document.getElementById('estado').textContent =
-      'El servidor no responde. ¿Has arrancado "python3 airo_server.py"?';
+      'El servidor no responde. ¿Has arrancado "python3 -m airo_ble.server"?';
   }
 }
 

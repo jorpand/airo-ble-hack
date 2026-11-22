@@ -337,3 +337,8 @@ Para colaborar, mira [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Las ruedas del robot están **cruzadas** respecto a la app oficial (ver la
   guía): la API habla en términos físicos, no te preocupes. Los **brazos no**
   están cruzados: ahí la app y el robot coinciden.
+- Con el **puente del ESP32-S3**, tocar el puerto serie para el puente en
+  marcha (un `mpremote exec`, un Ctrl+C…) **lo para**: la placa cae al REPL y
+  deja de servir, aunque siga contestando al ping. Se arregla reiniciándola
+  (`mise run firmware-deploy`). Está explicado en
+  [`firmware/esp32/README.md`](firmware/esp32/README.md).

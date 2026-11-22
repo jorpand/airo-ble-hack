@@ -51,6 +51,33 @@ Y para ver lo que dice la placa (la reinicia y saca el log de arranque):
 mise run firmware-logs
 ```
 
+## La trampa del puerto serie
+
+**Todo lo que abra el REPL por el puerto serie para el puente en marcha.**
+
+MicroPython ejecuta `main.py` una vez, al arrancar. Si alguien abre el REPL
+mientras tanto (un `mpremote exec`, un `Ctrl+C`, un `mpremote fs cp` o el
+reinicio de la máquina virtual al reconectar el USB), MicroPython **interrumpe
+el programa**: la placa cae al REPL y el puente deja de servir.
+
+Lo que confunde es que **la WiFi sigue puesta**: la placa contesta al ping y
+parece viva, pero `http://<ip>:8080/salud` no responde. Lo que se ve es:
+
+```
+$ curl http://192.168.1.147:8080/salud     # no contesta
+$ ping 192.168.1.147                        # responde: la placa esta viva
+```
+
+La solución es reiniciarla:
+
+```bash
+mise run firmware-deploy    # copia el firmware y reinicia
+mise run firmware-logs     # reinicia y enseña el log de arranque
+```
+
+Por eso `firmware-deploy` **siempre reinicia al final**, y por eso los logs
+se sacan con `--reset`.
+
 ## Los ficheros
 
 | Fichero | Qué hace |

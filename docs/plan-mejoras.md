@@ -81,19 +81,30 @@ No salen en la documentación y hay que tenerlas en el bolsillo:
 
 ### Lo que falta
 
-**El robot no se ha movido todavía.** La placa lo ve (`AIRo` =
-`64:E0:39:2D:90:80`), se conecta a él y descubre `FFF0`/`FFF1`, pero **falta la
-escritura real de los 20 bytes**: el robot estaba apagado (su módulo HM-10 solo
-se anuncia unos segundos tras encenderlo) y no se ha podido comprobar que se
-mueve.
+Nada de lo importante: **el robot se movió**. La placa lo ve (`AIRo` =
+`64:E0:39:2D:90:80`), se conecta a él, descubre `FFF0`/`FFF1`, le escribe los
+20 bytes y el robot los confirma (3 paquetes: parar → avanzar 1 s → parar).
 
-También falta comprobar el mDNS: el port del ESP32 ya lo trae (el nombre se
-pone antes de activar la interfaz), pero en la red de pruebas el tráfico mDNS
-entero no pasaba, así que el camino que funciona es la IP. Y un job de CI
-propio del firmware: no hace falta, porque `ruff` y `pyright` ya miran
-`firmware/`, los tests del firmware van en la suite normal y
-`tests/test_firmware_coherencia.py` vigila que la versión de MicroPython sea
-la misma en `mip.json`, en `mise.toml` y en el README.
+Lo que queda es de physiology:
+
+- El mDNS no se ha podido comprobar: el port del ESP32 ya lo trae (el nombre
+  se pone antes de activar la interfaz), pero en la red de pruebas el tráfico
+  mDNS entero no pasaba, así que el camino que funciona es la IP.
+- Un job de CI propio del firmware no hace falta: `ruff` y `pyright` ya lo
+  miran, sus tests van en la suite normal y `tests/test_firmware_coherencia.py`
+  vigila que la versión de MicroPython sea la misma en `mip.json`, en
+  `mise.toml` y en el README.
+
+### Una trampa que conviene conocer
+
+**Todo lo que abra el REPL por el puerto serie para el puente en marcha.**
+Un `mpremote exec`, un `Ctrl+C`, un `mpremote fs cp` o el reinicio de la
+máquina virtual al reconectar el USB **interrumpen `main.py`**: la placa cae al
+REPL y el puente deja de servir. Lo que confunde es que **la WiFi sigue
+puesta** (la placa contesta al ping), así que parece viva.
+
+La recuperación es reiniciarla: `mise run firmware-deploy` (copia el firmware y
+reinicia) o `mise run firmware-logs` (reinicia y saca el log de arranque).
 
 ---
 

@@ -229,11 +229,11 @@ mpremote connect /dev/ttyUSB0 fs cp main.py :main.py
 mpremote connect /dev/ttyUSB0 reset
 ```
 
-**Estado**: la placa está flasheada con MicroPython 1.29.0 (build `SPIRAM_OCT`),
-arranca, se conecta a la WiFi y **ve al robot** (`AIRo` = `64:E0:39:2D:90:80`) y
-**se conecta** a él. Falta el último paso: **escribir los 20 bytes y que el robot
-se mueva** (requiere el robot encendido; su módulo HM-10 solo se anuncia unos
-segundos tras encenderlo).
+**Estado**: **hecha**. La placa está flasheada con MicroPython 1.29.0 (build
+`SPIRAM_OCT`), arranca, se conecta a la WiFi, **ve al robot** (`AIRo` =
+`64:E0:39:2D:90:80`), se conecta a él, descubre `FFF0`/`FFF1` y **escribe los 20
+bytes**: el robot los confirmó (3 paquetes: parar → avanzar 1 s → parar) y se
+movió un segundo, justo lo que hace el spike.
 
 **Criterio de salida**: el robot se mueve desde el ESP32. Si aquí no se puede, el
 proyecto se replantea sin haber gastado más que una jornada.
@@ -250,10 +250,10 @@ proyecto se replantea sin haber gastado más que una jornada.
 **Criterio de salida**: `curl http://<ip>:8080/estado` y `curl -X POST --data-binary
 @paquete.bin http://<ip>:8080/escribir` funcionan y el robot obedece.
 
-**Estado**: el puente responde por HTTP desde el portátil (`/salud`, `/estado`,
-`/escanear`, `/escribir`, `/conectar`, `/desconectar`) y el cliente de Python
-habla con él de punta a punta por la red. Falta el "y el robot obedece" (el
-robot estaba apagado).
+**Estado**: **hecha**. El puente responde por HTTP desde el portátil (`/salud`,
+`/estado`, `/escanear`, `/escribir`, `/conectar`, `/desconectar`), el cliente de
+Python habla con él de punta a punta por la red y **el robot obedece**: se
+movió un segundo con los 20 bytes que le mandó la placa.
 
 ### Fase 2 — Backend Python (4-6 h) 🟢 hito — **hecha**
 
@@ -265,16 +265,19 @@ robot estaba apagado).
 **Criterio de salida**: la API del portátil, con `AIRO_BRIDGE_URL` puesto, mueve el
 robot a través del ESP32. Los tests en verde.
 
-**Estado**: el cliente y la API ya hablan con el puente (verificado contra la
-placa real). Falta lo mismo que en la Fase 0: verlo mover al robot.
+**Estado**: **hecha**. El cliente y la API hablan con el puente (verificado
+contra la placa real) y el paquete que llega al robot es el de 20 bytes que
+construye `protocol.py`.
 
 ### Fase 3 — Tooling, CI y documentación (4-6 h)
 
-- `mise run firmware-flash` (esptool + mpremote), `firmware-run`, `firmware-wifi`.
+- `mise run firmware-flash` (esptool + mpremote), `firmware-deploy`,
+  `firmware-run`, `firmware-spike`, `firmware-wifi`, `firmware-logs`.
 - CI: job que comprueba que el firmware pasa `ruff`/`pyright` (MicroPython es
   Python; se puede analizar con las mismas herramientas) y que `mip.json` está
   coherente.
-- `firmware/esp32/README.md`: flasheo, particiones, IP, mDNS, credenciales.
+- `firmware/esp32/README.md`: flasheo, particiones, IP, mDNS, credenciales y la
+  trampa del puerto serie.
 
 **Estado**: las tareas de mise están (`firmware-flash`, `firmware-run`,
 `firmware-wifi`, `firmware-logs`). La CI no necesita un job aparte: `ruff` y

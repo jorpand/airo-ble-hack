@@ -148,6 +148,23 @@ echo "Puerto: $PUERTO"
 $AIRO_PYTHON -m mpremote connect "$PUERTO" run {{config_root}}/firmware/esp32/spike.py
 """
 
+[tasks.firmware-deploy]
+description = "Copia todo el firmware a la placa y la reinicia"
+#: Copia los ficheros del firmware a la placa y la reinicia (para que arranque
+#: el puente con el codigo nuevo). OJO: todo lo que abra el puerto serie
+#: interrumpe el programa que se este ejecutando, asi que al final se
+#: reinicia siempre.
+run = """
+PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
+if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
+echo "Puerto: $PUERTO"
+for f in main.py puente.py ble_robot.py http_srv.py wifi.py spike.py; do
+    $AIRO_PYTHON -m mpremote connect "$PUERTO" fs cp {{config_root}}/firmware/esp32/$f :$f
+    sleep 1
+done
+$AIRO_PYTHON -m mpremote connect "$PUERTO" reset
+"""
+
 [tasks.firmware-logs]
 description = "Muestra en el terminal lo que dice la placa por el puerto serie"
 #: Con el USB nativo, abrir el puerto no reinicia la placa, asi que se

@@ -197,6 +197,7 @@ firmware/esp32/
 ├── ble_robot.py  # cliente BLE: escanear, conectar, descubrir, escribir, refrescar
 ├── http_srv.py   # servidor HTTP mínimo sobre asyncio.start_server
 ├── wifi.py       # conexión a la WiFi (las credenciales van en wifi.json)
+├── led.py        # el LED RGB: el color es el estado, el destello es la actividad
 ├── spike.py      # el spike de la Fase 0, a pelo
 ├── mip.json      # sin dependencias externas
 └── README.md     # flasheo, particiones, IP, credenciales del WiFi
@@ -231,6 +232,11 @@ Detalles del hardware:
 - **Dos USB en la placa**: el nativo (CDC) y el del puente UART (CH343). Para
   flashear, el UART es más cómodo (auto-reset); con el nativo hay que mantener
   pulsado BOOT al resetear.
+- **LED RGB (WS2812)**: está en el GPIO48 en las placas rev. 1.0 y en el
+  GPIO38 en las rev. 1.1 (el chip no lo dice, así que se manejan los dos).
+  Se usa como indicador de estado: rojo = nada conectado, azul = buscando,
+  verde = conectado, y parpadea del color que tenga cuando llegan comandos
+  (ver `firmware/esp32/README.md`).
 
 ## 7. Plan de trabajo
 

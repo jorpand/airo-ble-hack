@@ -32,6 +32,13 @@ UUID_CHARACTERISTIC = 0xFFF1
 #: Espera maxima de cada paso, en milisegundos.
 TIMEOUT_MS = 10000
 
+#: Espera maxima de la escritura (milisegundos).
+#:
+#: Es menor que el resto porque la escritura pasa por HTTP: si el robot no
+#: contesta, la peticion web se queda esperando. Con 10 s, una fila de
+#: peticiones colgadas tumba el puente entero.
+TIMEOUT_ESCRITURA_MS = 5000
+
 #: Cada cuanto se mira si ya ha pasado algo (milisegundos).
 PASO_MS = 50
 
@@ -156,6 +163,10 @@ class ClienteAiro:
         #: el puente escanea en segundo plano mientras tambien atiende por
         #: HTTP. Este candado serializa esas operaciones.
         self.lock = asyncio.Lock()
+        #: Y lo mismo con las escrituras: solo puede haber una en vuelo. Si
+        #: el refresco y la peticion HTTP escriben a la vez, el robot
+        #: contesta con un error (o se le rompe el enlace).
+        self.lock_escritura = asyncio.Lock()
 
     # -- IRQ ---------------------------------------------------------------
     #
@@ -314,26 +325,32 @@ class ClienteAiro:
             return False
         return True
 
-    async def escribir(self, datos, con_respuesta=True, timeout_ms=TIMEOUT_MS):
-        """Escribe los bytes en FFF1. Devuelve True si el robot lo confirma."""
-        conn = self.conn
-        handle = self.caracteristica
-        if conn < 0 or handle == 0:
-            self.error = "no hay conexion"
-            return False
-        self.escrito = -1
-        modo = 1 if con_respuesta else 0
-        self.ble.gattc_write(conn, handle, datos, modo)
-        if not await esperar_hasta(lambda: self.escrito >= 0, timeout_ms):
-            self.error = "la escritura no tuvo respuesta"
-            return False
-        if self.escrito != 0:
-            self.error = f"el robot contesto con error {self.escrito}"
-            return False
-        self.paquetes += 1
-        self.ultimo = bytes(datos)
-        self.fallos = 0
-        return True
+    async def escribir(self, datos, con_respuesta=True, timeout_ms=TIMEOUT_ESCRITURA_MS):
+        """Escribe los bytes en FFF1. Devuelve True si el robot lo confirma.
+
+        El candado `lock_escritura` evita que esta escritura se solape con
+        el reenvio del refresco: dos escrituras a la vez hacen que el robot
+        conteste con error y que se pierda el enlace.
+        """
+        async with self.lock_escritura:
+            conn = self.conn
+            handle = self.caracteristica
+            if conn < 0 or handle == 0:
+                self.error = "no hay conexion"
+                return False
+            self.escrito = -1
+            modo = 1 if con_respuesta else 0
+            self.ble.gattc_write(conn, handle, datos, modo)
+            if not await esperar_hasta(lambda: self.escrito >= 0, timeout_ms):
+                self.error = "la escritura no tuvo respuesta"
+                return False
+            if self.escrito != 0:
+                self.error = f"el robot contesto con error {self.escrito}"
+                return False
+            self.paquetes += 1
+            self.ultimo = bytes(datos)
+            self.fallos = 0
+            return True
 
     async def refrescar(self, timeout_ms=500):
         """Reenvia el ultimo paquete (el que el robot tiene guardado).
@@ -345,27 +362,28 @@ class ClienteAiro:
 
         Devuelve True si se ha reenviado bien.
         """
-        conn = self.conn
-        handle = self.caracteristica
-        if conn < 0 or handle == 0 or not self.ultimo:
-            return False
-        self.escrito = -1
-        try:
-            self.ble.gattc_write(conn, handle, self.ultimo, 1)
-        except Exception as exc:  # pragma: no cover - depende del hardware
-            self.fallos += 1
-            self.error = f"no se pudo reenviar ({exc})"
-            return False
-        if not await esperar_hasta(lambda: self.escrito >= 0, timeout_ms):
-            self.fallos += 1
-            self.error = "el reenvio no tuvo respuesta"
-            return False
-        if self.escrito != 0:
-            self.fallos += 1
-            self.error = f"el robot contesto con error {self.escrito}"
-            return False
-        self.fallos = 0
-        return True
+        async with self.lock_escritura:
+            conn = self.conn
+            handle = self.caracteristica
+            if conn < 0 or handle == 0 or not self.ultimo:
+                return False
+            self.escrito = -1
+            try:
+                self.ble.gattc_write(conn, handle, self.ultimo, 1)
+            except Exception as exc:  # pragma: no cover - depende del hardware
+                self.fallos += 1
+                self.error = f"no se pudo reenviar ({exc})"
+                return False
+            if not await esperar_hasta(lambda: self.escrito >= 0, timeout_ms):
+                self.fallos += 1
+                self.error = "el reenvio no tuvo respuesta"
+                return False
+            if self.escrito != 0:
+                self.fallos += 1
+                self.error = f"el robot contesto con error {self.escrito}"
+                return False
+            self.fallos = 0
+            return True
 
     def desconectar(self):
         """Cierra la conexion BLE."""

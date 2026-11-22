@@ -143,6 +143,7 @@ contra la placa (no salen en la documentación):
 | `gap_scan(0)` para parar | No: `gap_scan(0)` deja el escaneo para siempre. Se para con `gap_scan(None)` |
 | Descubrir `UUID(0xFFF0)` | El robot lo registra con UUID de 128 bits: hay que descubrir **todo** y filtrar |
 | Dos escaneos a la vez | NimBLE contesta `EALREADY`: solo se admite uno. Por eso el cliente lleva un candado |
+| Dos escrituras a la vez | El robot contesta con error (7) y se pierde el enlace. Por eso las escrituras tambien van con candado |
 | `print(..., flush=True)` | No existe en MicroPython |
 
 Y el layout de los datos de cada evento (en 1.26 y en 1.29 es el mismo):
@@ -170,6 +171,12 @@ GATTC_WRITE_DONE       (conn_handle, value_handle, status)
   por segundo. El portátil solo manda el paquete cuando **cambia**.
 - **Solo hay un escaneo a la vez.** Por eso las rutas HTTP no escanean: esperan a
   la tarea de fondo (`mantener_conexion`), que es la que busca al robot.
+- **Y solo hay una escritura a la vez.** La tarea de refresco (que reenvía el
+  último paquete cada 50 ms) y las peticiones HTTP de `/escribir` van con un
+  candado: si se solapan, el robot contesta con error y se cae el enlace.
+- **El enlace BLE lo lleva la placa, no el cliente.** El cliente del portátil
+  no debe soltar la conexión cuando algo falla (eso le arrancaría el robot de
+  las manos a la placa en justo el momento en que lo acaba de pillar).
 
 ## Hablar con la placa desde el portátil
 

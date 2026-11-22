@@ -73,6 +73,11 @@ class AiroWriteError(AiroError):
 class AiroRobot:
     """Envoltorio async sobre bleak con el protocolo de AIRO."""
 
+    #: Este cliente lleva el enlace BLE el mismo, asi que puede (y debe)
+    #: soltar la conexion para reconectar. El cliente del puente no: ahi la
+    #: conexion la lleva la placa.
+    conexion_gestionada = False
+
     def __init__(
         self,
         *,

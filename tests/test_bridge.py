@@ -48,6 +48,8 @@ class ClienteFalso:
         self.recibidos: list[bytes] = []
         #: Cuantas veces le han pedido escanear.
         self.escaneos = 0
+        #: Cuantas veces le han pedido desconectar.
+        self.desconexiones = 0
 
     async def buscar_robot(self, timeout_ms: int = 0, paso_ms: int = 0, sondear: bool = True):
         if self.conn >= 0:
@@ -72,6 +74,7 @@ class ClienteFalso:
 
     def desconectar(self) -> None:
         self.conn = -1
+        self.desconexiones += 1
 
     async def escanear(self, ms: int = 0) -> dict[Any, Any]:
         self.escaneos += 1
@@ -357,6 +360,33 @@ async def test_un_paquete_fallido_se_vuelve_a_mandar(puente: Any) -> None:
     cliente.conn = 1
     await robot.send(Command())
     assert len(cliente.recibidos) == 1
+
+
+async def test_la_sesion_no_suelta_la_conexion_de_la_placa(
+    puente: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si falla un envio, la sesion NO debe desconectar.
+
+    El enlace BLE lo lleva la placa (ella escanea, conecta y reconecta
+    sola). Si la sesion suelta la conexion cuando algo falla, le arranca
+    al robot de las manos a la placa en el momento justo en que lo acaba
+    de pillar, y se quedan peleando por el enlace.
+    """
+    url, cliente = puente
+    monkeypatch.setenv(PUENTE_ENV, url)
+
+    sesion = RobotSession()
+    await sesion.conectar()
+    try:
+        # la placa "pierde" el robot
+        cliente.conn = -1
+        with pytest.raises(AiroNotConnected):
+            await sesion.robot.send(Command())
+        # el refresco de la sesion falla tambien, y aun asi...
+        await asyncio.sleep(0.3)
+        assert cliente.desconexiones == 0
+    finally:
+        await sesion.desconectar()
 
 
 # --- La cadena entera: sesion y API -> puente -> placa -------------------------

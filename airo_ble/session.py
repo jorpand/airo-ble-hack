@@ -205,11 +205,17 @@ class RobotSession:
         reciente**: antes se tragaba la excepcion nueva con un `continue`, de
         modo que la interfaz se quedaba mostrando el primer error para
         siempre (util cuando el robot esta apagado y cambia el motivo).
+
+        OJO: si el enlace lo lleva otra cosa (el puente del ESP32-S3), **no
+        se desconecta**: la placa ya esta reconectando por su cuenta y
+        soltar la conexion desde aqui le arrancaria el robot de las manos
+        en el momento justo en que la acaba de pillar.
         """
-        try:
-            await self.robot.disconnect()
-        except Exception:
-            pass
+        if not getattr(self.robot, "conexion_gestionada", False):
+            try:
+                await self.robot.disconnect()
+            except Exception:
+                pass
         while True:
             await asyncio.sleep(self.espera_reconexion)
             try:

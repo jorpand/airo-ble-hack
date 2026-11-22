@@ -86,6 +86,11 @@ class BridgeRobot:
     manda los bytes al puente por HTTP y el puente los escribe en el robot.
     """
 
+    #: El enlace BLE lo lleva la placa (ella escanea, conecta y reconecta
+    #: sola). Por eso el cliente **no debe soltar la conexion** cuando algo
+    #: falla: si lo hace, le arranca al robot de las manos a la placa.
+    conexion_gestionada = True
+
     def __init__(self, url: str, timeout: float = TIMEOUT) -> None:
         self.url = url.rstrip("/")
         self.timeout = timeout

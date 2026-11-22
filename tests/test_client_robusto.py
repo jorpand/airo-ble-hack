@@ -125,6 +125,19 @@ class FakeScanner:
     async def stop(self):
         self.arrancado = False
 
+    @classmethod
+    async def discover(cls, timeout=10.0, return_adv=False):
+        """El `discover` que usa `AiroRobot.escanear` (bleak >= 3)."""
+        encontrados = {}
+        for _ in range(cls.anuncios):
+            dev = FakeDevice(cls.direccion)
+            adv = FakeAdv(rssi=cls.rssi)
+            if return_adv:
+                encontrados[dev.address] = (dev, adv)
+            else:
+                encontrados[dev.address] = dev
+        return encontrados
+
 
 def install_fake_bleak() -> None:
     module = types.ModuleType("bleak")
@@ -187,6 +200,43 @@ async def test_una_escritura_colgada_da_timeout_con_mensaje() -> None:
     with pytest.raises(AiroWriteError) as exc:
         await robot.send(Command())
     assert "no respondió" in str(exc.value)
+
+
+async def test_el_escaneo_del_cliente_ble_tiene_el_formato_comun() -> None:
+    """Los dos clientes devuelven la lista de dispositivos **igual**.
+
+    El cliente del puente devuelve lo que ve la placa y este lo que ve el
+    portatil, pero el formato es el mismo: asi el comando `airo scan` se ve
+    igual en los dos caminos.
+    """
+    robot = AiroRobot()
+    datos = await robot.escanear(1.0)
+    dispositivos = datos["dispositivos"]
+    assert dispositivos
+    assert set(dispositivos[0]) == {"mac", "nombre", "rssi"}
+    assert dispositivos[0]["mac"] == "AA:BB:CC:DD:EE:FF"
+    assert dispositivos[0]["nombre"] == "AIRo"
+
+
+async def test_si_no_hay_radio_el_escaneo_da_airo_error() -> None:
+    """Si el radio no esta disponible, el error es `AiroError`.
+
+    Como en el puente: el que llama al robot no se tiene que enterar de si
+    esta hablando con bleak o por HTTP, solo de que ha fallado.
+    """
+
+    class ScannerRoto:
+        @classmethod
+        async def discover(cls, timeout=10.0, return_adv=False):
+            raise RuntimeError("no hay bluez")
+
+    import bleak
+
+    bleak.BleakScanner = ScannerRoto
+    robot = AiroRobot()
+    with pytest.raises(AiroError) as exc:
+        await robot.escanear(1.0)
+    assert "no hay bluez" in str(exc.value)
 
 
 async def test_si_no_hay_robot_da_airo_not_found() -> None:

@@ -61,6 +61,19 @@ firmware no se queda obsoleto cuando el protocolo cambie.
   `AIRO_BRIDGE_URL`. Es el **único** punto donde se decide, así que la consola,
   la API web, el plugin de Scratch y la CLI se comportan igual sin tocar su
   código.
+- **Una sola interfaz para los dos caminos** (`airo_ble/cliente.py`): los dos
+  clientes (`AiroRobot` con bleak y `BridgeRobot` por HTTP) heredan de
+  `ClienteRobot`, que tiene los atajos (`drive`, `servo`, `servos`, `led`,
+  `stop`, `reset`), el ciclo de vida (`connect`, `disconnect`, `reconnect`) y
+  las consultas (`escanear`, `estado`, `salud`). Los dos devuelven **el mismo
+  formato** y **los mismos errores** (`AiroNotFound`, `AiroConnectionError`,
+  `AiroNotConnected`, `AiroWriteError`), así que el código que llama al robot
+  no tiene que saber por dónde va. El test `tests/test_bridge.py` compara las
+  dos interfaces y falla si a uno le falta un método del otro.
+- **La placa no agarra al robot sola** (`AUTO_CONECTAR = False` en
+  `firmware/esp32/puente.py`): el enlace se abre cuando alguien lo pide
+  (`POST /conectar`, que es lo que hace el botón "Conectar" de la web). Con
+  `True` vuelve a engancharse sola, en cuanto lo ve.
 - **Tests**: el servidor HTTP del firmware de verdad (con un BLE de mentira)
   contra el cliente de verdad. Sin placa y sin robot.
 

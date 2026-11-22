@@ -25,7 +25,9 @@ from airo_ble.client import (
     AiroConnectionError,
     AiroNotConnected,
     AiroNotFound,
+    AiroRobot,
 )
+from airo_ble.cliente import ClienteRobot
 from airo_ble.protocol import Command, Led
 from airo_ble.session import RobotSession
 
@@ -33,8 +35,10 @@ from airo_ble.session import RobotSession
 class ClienteFalso:
     """El cliente BLE del robot, pero de mentira (para la placa)."""
 
-    def __init__(self, conectado: bool = True) -> None:
+    def __init__(self, conectado: bool = True, hay_robot: bool = True) -> None:
         self.conn = 1 if conectado else -1
+        #: Si el robot esta a mano (se anuncia) o no.
+        self.hay_robot = hay_robot
         self.caracteristica = 5
         self.ultimo = b""
         self.fallos = 0
@@ -52,7 +56,7 @@ class ClienteFalso:
         self.desconexiones = 0
 
     async def buscar_robot(self, timeout_ms: int = 0, paso_ms: int = 0, sondear: bool = True):
-        if self.conn >= 0:
+        if self.hay_robot:
             return b"\x64\xe0\x39\x2d\x90\x80", 0
         return None, None
 
@@ -106,7 +110,7 @@ async def puente(monkeypatch: pytest.MonkeyPatch) -> Any:
     modulo_puente = cargar("puente")
     # Los tiempos de la placa se acortan para que los tests no tarden: en la
     # placa real `/conectar` espera 30 s a que el robot aparezca.
-    monkeypatch.setattr(modulo_puente, "ESPERA_CONEXION_MS", 300)
+    monkeypatch.setattr(modulo_puente, "ESPERA_BUSQUEDA_MS", 300)
     monkeypatch.setattr(modulo_puente, "ESCANEO_MS", 50)
     cliente = ClienteFalso()
     p = modulo_puente.Puente()
@@ -127,6 +131,42 @@ async def puente(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 # --- La configuracion ----------------------------------------------------------
+
+
+def test_los_dos_clientes_tienen_la_misma_interfaz() -> None:
+    """El cliente BLE y el del puente se usan **igual**: misma interfaz.
+
+    Es la unificacion de las dos APIs: mismo metodos, mismo ciclo de vida,
+    mismos errores. Si uno de los dos tiene un metodo que el otro no, el
+    codigo que llama al robot dejaria de funcionar con el otro camino (y
+    nadie se entera hasta que alguien usa el otro camino). Este test lo
+    vigila.
+    """
+
+    def metodos(clase: type) -> set[str]:
+        return {
+            nombre
+            for nombre in dir(clase)
+            if not nombre.startswith("_") and callable(getattr(clase, nombre, None))
+        }
+
+    assert metodos(AiroRobot) == metodos(BridgeRobot)
+
+
+def test_los_dos_clientes_heredan_de_la_misma_base() -> None:
+    """Los dos clientes son del mismo tipo: eso es lo que unifica el codigo."""
+    assert issubclass(AiroRobot, ClienteRobot)
+    assert issubclass(BridgeRobot, ClienteRobot)
+
+
+def test_el_cliente_ble_es_el_que_lleva_el_enlace() -> None:
+    """Solo el cliente BLE suelta la conexion para reconectar.
+
+    El del puente no puede: la conexion la lleva la placa (que ya la ha
+    establecido), y soltarla le arrancaria el robot de las manos.
+    """
+    assert AiroRobot.conexion_gestionada is False
+    assert BridgeRobot.conexion_gestionada is True
 
 
 def test_sin_variable_no_hay_puente(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -205,39 +245,37 @@ async def test_sin_robot_no_se_conecta(puente: Any) -> None:
     """Si el puente no encuentra al robot, se avisa con `AiroNotFound`."""
     url, cliente = puente
     cliente.conn = -1
+    cliente.hay_robot = False
     robot = BridgeRobot(url)
     with pytest.raises(AiroNotFound):
         await robot.connect()
 
 
-async def test_conectar_espera_al_robot(puente: Any) -> None:
-    """La ruta `/conectar` espera a que la tarea de fondo pille al robot."""
-    url, cliente = puente
-    cliente.conn = -1
+async def test_la_ruta_de_conectar_busca_y_conecta(puente: Any) -> None:
+    """La ruta `/conectar` busca el robot, se conecta y descubre.
 
-    async def aparece_dentro_de_un_rato() -> None:
-        await asyncio.sleep(0.1)
-        cliente.conn = 1
-
-    tarea = asyncio.create_task(aparece_dentro_de_un_rato())
-    robot = BridgeRobot(url)
-    await robot.connect()
-    await tarea
-    assert robot.is_connected is True
-
-
-async def test_la_ruta_de_conectar_no_escanea(puente: Any) -> None:
-    """La ruta no escanea: el escaneo lo hace la tarea de fondo.
-
-    Si las dos escanearan a la vez, NimBLE contestaria `EALREADY` (solo se
-    admite un escaneo a la vez).
+    Con `AUTO_CONECTAR` a False la placa **no** agarra al robot por su
+    cuenta: se conecta cuando alguien lo pide. Y todo el proceso va con un
+    candado, para que dos peticiones no se peleen por el robot.
     """
     url, cliente = puente
     cliente.conn = -1
     robot = BridgeRobot(url)
+    await robot.connect()
+    assert robot.is_connected is True
+    assert cliente.conn == 1
+
+
+async def test_conectar_tarda_lo_que_tarda_en_encontrarlo(puente: Any) -> None:
+    """Si el robot no esta a mano, la ruta responde con un error claro."""
+    url, cliente = puente
+    cliente.conn = -1
+    cliente.hay_robot = False
+    robot = BridgeRobot(url)
     with pytest.raises(AiroNotFound):
         await robot.connect()
-    assert cliente.escaneos == 0
+    # y no se queda enganchado a una conexion a medias
+    assert cliente.conn == -1
 
 
 async def test_escribir_sin_conexion_avisa(puente: Any) -> None:
@@ -387,6 +425,17 @@ async def test_la_sesion_no_suelta_la_conexion_de_la_placa(
         assert cliente.desconexiones == 0
     finally:
         await sesion.desconectar()
+
+
+async def test_el_escaneo_del_puente_tiene_el_formato_comun(puente: Any) -> None:
+    """La lista de dispositivos del puente tiene el mismo formato que la del
+    cliente BLE: `{"mac", "nombre", "rssi"}`."""
+    url, _cliente = puente
+    robot = BridgeRobot(url)
+    datos = await robot.escanear(1.0)
+    dispositivos = datos["dispositivos"]
+    assert dispositivos
+    assert set(dispositivos[0]) == {"mac", "nombre", "rssi"}
 
 
 # --- La cadena entera: sesion y API -> puente -> placa -------------------------

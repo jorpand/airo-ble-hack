@@ -33,8 +33,9 @@ from .arms import (
     BrazoError,
     resolver_objetivos,
 )
-from .bridge import BridgeRobot, crear_robot
-from .client import AiroNotFound, AiroRobot
+from .bridge import crear_robot
+from .client import AiroNotFound
+from .cliente import ClienteRobot
 from .protocol import (
     JOINT_NAMES,
     SERVO_BYTE_MAX,
@@ -232,7 +233,7 @@ class Console:
 
     def __init__(
         self,
-        robot: AiroRobot | BridgeRobot,
+        robot: ClienteRobot,
         *,
         keepalive: bool = True,
         keepalive_interval: float = 0.05,
@@ -476,16 +477,23 @@ class Console:
         return await self._cmd_reconectar(args)
 
     async def _cmd_escanear(self, args: list[str]) -> str:
-        from bleak import BleakScanner
+        """Escanea con el cliente de siempre (puente o BLE del portatil).
 
-        found = await BleakScanner.discover(timeout=10.0, return_adv=True)
+        Es el mismo escaneo que hace `airo scan` en la linea de comandos:
+        si hay un puente configurado, escanea la placa (que tiene el radio
+        al lado del robot); si no, escanea el portatil.
+        """
+        datos = await self.robot.escanear(10.0)
+        dispositivos = datos.get("dispositivos") or []
+        if not dispositivos:
+            return "No se ha visto ningun dispositivo BLE."
         lines = []
-        for value in found.values():
-            dev, adv = value if isinstance(value, tuple) else (value, None)
-            name = getattr(adv, "local_name", None) or getattr(dev, "name", None) or "(sin nombre)"
-            rssi = getattr(adv, "rssi", "?")
-            lines.append(f"  {dev.address}  {name:22s}  rssi={rssi}")
-        return "\n".join(lines) if lines else "No se ha visto ningun dispositivo BLE."
+        for dev in dispositivos:
+            nombre = dev.get("nombre") or "(sin nombre)"
+            lines.append(
+                f"  {dev.get('mac', '?'):18s}  {nombre:22s}  rssi={dev.get('rssi', '?')}"
+            )
+        return "\n".join(lines)
 
     async def _cmd_scan(self, args: list[str]) -> str:
         return await self._cmd_escanear(args)

@@ -21,8 +21,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from .bridge import BridgeRobot, crear_robot
-from .client import AiroRobot
+from .bridge import crear_robot
+from .cliente import ClienteRobot
 from .protocol import SERVO_CENTER, Joint, Led
 
 __all__ = [
@@ -96,7 +96,7 @@ class RobotSession:
     ) -> None:
         #: El cliente del robot: el puente del ESP32-S3 si hay uno
         #: configurado (`AIRO_BRIDGE_URL`), si no el BLE de siempre.
-        self.robot: AiroRobot | BridgeRobot = crear_robot(
+        self.robot: ClienteRobot = crear_robot(
             address=address, scan_timeout=scan_timeout
         )
         self.refresco = refresco
@@ -479,7 +479,7 @@ class RobotSession:
             "conectado": bool(self.conectado and self.robot.is_connected),
             # Si se habla con el robot a traves del puente del ESP32-S3, se
             # dice cual es: asi se sabe de un vistazo por donde van las cosas.
-            "puente": self.robot.url if isinstance(self.robot, BridgeRobot) else None,
+            "puente": self.robot.url or None,
             "accion": self.accion_actual,
             "error": self.error,
             "luz": cmd.led.name.lower(),

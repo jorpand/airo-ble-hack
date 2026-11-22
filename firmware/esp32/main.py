@@ -26,7 +26,11 @@ async def main():
         wifi.publicar_nombre(puente.HOSTNAME)
     loop = asyncio.get_event_loop()
     b = puente.Puente()
-    loop.create_task(b.mantener_conexion())
+    if b.auto_conectar:
+        # La placa agarra al robot por su cuenta (y lo mantiene). Con
+        # `AUTO_CONECTAR` a False, el robot se conecta solo cuando se le
+        # pide (el boton "Conectar" de la web).
+        loop.create_task(b.mantener_conexion())
     loop.create_task(b.refrescar())
     await puente.http_srv.servir("0.0.0.0", puente.PUERTO, b.rutas())
 

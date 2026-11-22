@@ -26,13 +26,12 @@ import asyncio
 import time
 from typing import Any
 
+from .cliente import ClienteRobot
 from .protocol import (
     ROBOT_NAME,
     SERVICE_UUID,
     WRITE_CHARACTERISTIC_UUID,
     Command,
-    Joint,
-    Led,
 )
 
 __all__ = [
@@ -70,7 +69,7 @@ class AiroWriteError(AiroError):
     """Falló (o se colgó) la escritura en la characteristic."""
 
 
-class AiroRobot:
+class AiroRobot(ClienteRobot):
     """Envoltorio async sobre bleak con el protocolo de AIRO."""
 
     #: Este cliente lleva el enlace BLE el mismo, asi que puede (y debe)
@@ -90,6 +89,7 @@ class AiroRobot:
         write_timeout: float = 10.0,
         min_write_interval: float = 0.05,
     ) -> None:
+        super().__init__()
         self.name = name
         self.address = address
         self.scan_timeout = scan_timeout
@@ -101,7 +101,6 @@ class AiroRobot:
 
         self._client: Any = None
         self._characteristic: Any = None
-        self._command = Command()
         self._last_write = 0.0
         self._lock = asyncio.Lock()
         #: Direccion -> (dispositivo, rssi, momento). Es un diccionario y no
@@ -111,13 +110,6 @@ class AiroRobot:
         self._seen: dict[str, tuple[Any, int, float]] = {}
 
     # -- ciclo de vida ---------------------------------------------------
-
-    async def __aenter__(self) -> AiroRobot:
-        await self.connect()
-        return self
-
-    async def __aexit__(self, *exc_info: object) -> None:
-        await self.disconnect()
 
     @property
     def is_connected(self) -> bool:
@@ -455,36 +447,57 @@ class AiroRobot:
         """Sustituye el estado compuesto (por ejemplo, para hacer un reset)."""
         self._command = value
 
-    async def drive(self, *, left: float = 0.0, right: float = 0.0) -> bytes:
-        """Mueve las ruedas. Rango útil de velocidad: -3..3 (signo = sentido)."""
-        self._command.left_speed = left
-        self._command.right_speed = right
-        return await self.send(self._command)
+    async def escanear(self, timeout: float = 10.0) -> dict[str, Any]:
+        """Escanea y devuelve lo que se ve.
 
-    async def servo(self, joint: Joint, angle: float) -> bytes:
-        """Mueve una articulación a un ángulo en grados."""
-        self._command.set_joint(joint, angle)
-        return await self.send(self._command)
-
-    async def servos(self, **angles: float) -> bytes:
-        """Mueve varias articulaciones de golpe: `servos(left_arm=30, ...)`.
-
-        Los nombres aceptados son los de `Joint` en minúsculas con guion bajo.
+        El formato es **el mismo que el del puente**: una lista de
+        dispositivos con su MAC, su nombre y su RSSI. Asi el comando
+        `airo scan` se ve igual en los dos caminos.
         """
-        for key, value in angles.items():
-            joint = Joint[key.upper()]
-            self._command.set_joint(joint, value)
-        return await self.send(self._command)
+        try:
+            from bleak import BleakScanner
+        except ImportError as exc:  # pragma: no cover
+            raise AiroError(
+                "Falta bleak: pip install bleak  (Linux: sudo apt install python3-bleak)"
+            ) from exc
 
-    async def led(self, mode: Led) -> bytes:
-        """Apaga/enciende/parpadea/funde el LED azul."""
-        self._command.led = mode
-        return await self.send(self._command)
+        try:
+            encontrados = await BleakScanner.discover(timeout=timeout, return_adv=True)
+        except Exception as exc:
+            # Lo mismo que el puente: si el radio no esta disponible (no hay
+            # BlueZ, no hay adaptador...), el error es `AiroError`, no una
+            # excepcion rara de bleak.
+            raise AiroError(f"No se ha podido escanear: {exc}") from exc
+        dispositivos: list[dict[str, Any]] = []
+        # bleak <= 2.x: dict[BLEDevice, AdvertisementData]
+        # bleak >= 3.x: dict[str, tuple[BLEDevice, AdvertisementData]]
+        for valor in encontrados.values():
+            dev, adv = valor if isinstance(valor, tuple) else (valor, None)
+            rssi = getattr(adv, "rssi", None)
+            dispositivos.append(
+                {
+                    "mac": str(getattr(dev, "address", "")),
+                    "nombre": (
+                        getattr(adv, "local_name", None)
+                        or getattr(dev, "name", None)
+                        or ""
+                    ),
+                    "rssi": int(rssi) if rssi is not None else -999,
+                }
+            )
+        return {"dispositivos": dispositivos}
 
-    async def stop(self) -> bytes:
-        """Para las ruedas."""
-        self._command.stop()
-        return await self.send(self._command)
+    async def estado(self) -> dict[str, Any]:
+        """El estado de la conexión con el robot."""
+        return {
+            "conectado": self.is_connected,
+            "mac": self.address or "",
+            "nombre": self.name,
+        }
+
+    async def salud(self) -> dict[str, Any]:
+        """Comprueba que el cliente vive (no que el robot esté)."""
+        return {"ok": True, "servidor": "airo-ble"}
 
     async def reset(self) -> bytes:
         """Equivalente a `BleRobot.ResetStatus`: servos a 0 y ruedas paradas."""

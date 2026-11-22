@@ -180,6 +180,15 @@ python -m airo_ble.console
 Sin esa variable, todo sigue yendo por BLE directo como siempre: la variable
 solo decide **dónde** se habla con el robot.
 
+Los dos caminos se usan **exactamente igual**: los clientes (`AiroRobot` con
+bleak y `BridgeRobot` por HTTP) heredan de la misma clase base
+(`airo_ble/cliente.py`), tienen los mismos métodos, devuelven el mismo formato
+y dan los mismos errores. El código que llama al robot no sabe por dónde va.
+
+La placa **no agarra al robot por su cuenta**: se conecta cuando se le pide
+(el botón "Conectar" de la web, o `POST /conectar`). Con `AUTO_CONECTAR =
+True` en `firmware/esp32/puente.py` vuelve a engancharse sola.
+
 El firmware y su guía están en [`firmware/esp32/`](firmware/esp32/) y el plan
 del proyecto en [`docs/plan-esp32.md`](docs/plan-esp32.md).
 
@@ -189,6 +198,7 @@ del proyecto en [`docs/plan-esp32.md`](docs/plan-esp32.md).
 airo/
 ├── airo_ble/            # LA LIBRERIA (todo lo instalable vive aqui)
 │   ├── protocol.py      # el protocolo de 20 bytes (LA fuente de la verdad)
+│   ├── cliente.py       # la interfaz comun de los clientes del robot
 │   ├── client.py        # cliente BLE
 │   ├── bridge.py        # cliente del puente del ESP32-S3 (y la fábrica)
 │   ├── session.py       # conexión + ejecución de programas

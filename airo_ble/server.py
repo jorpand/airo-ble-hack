@@ -43,8 +43,8 @@ from pathlib import Path
 from typing import Any
 
 from airo_ble.arms import BrazoError, resolver_brazo, resolver_objetivos
-from airo_ble.bridge import BridgeRobot, crear_robot
-from airo_ble.client import AiroRobot
+from airo_ble.bridge import crear_robot
+from airo_ble.cliente import ClienteRobot
 from airo_ble.console import load_calibration
 from airo_ble.protocol import JOINT_NAMES, SERVO_CENTER, Joint, Led
 
@@ -63,7 +63,7 @@ class AiroService:
         self.address = address
         self.scan_timeout = scan_timeout
         self.connect_robot = connect_robot
-        self.robot: AiroRobot | BridgeRobot = crear_robot(
+        self.robot: ClienteRobot = crear_robot(
             address=address, scan_timeout=scan_timeout
         )
         self.loop: asyncio.AbstractEventLoop | None = None

@@ -104,20 +104,41 @@ Detalles de diseño:
   HTTP por segundo sería mucho tráfico para 20 bytes. Así que el portátil solo
   manda el paquete cuando **cambia**, y la placa se encarga del refresco.
 - **Solo hay un escaneo a la vez.** NimBLE contesta `EALREADY` si se pisan dos
-  escaneos, así que el cliente BLE lleva un candado y las rutas HTTP **no
-  escanean**: esperan a la tarea de fondo, que es la que busca al robot.
+  escaneos, así que el cliente BLE lleva un candado y las rutas HTTP que
+  escanean van con otro (`lock_conexion`): la de `/conectar` (que busca, conecta
+  y descubre) no se solapa con la de `/escanear`.
 
 ## 5. El lado Python
 
-### 5.1 `airo_ble/bridge.py` (nuevo)
+### 5.1 `airo_ble/cliente.py` y `airo_ble/bridge.py`
 
-Clase `BridgeRobot` con **la misma interfaz async** que `AiroRobot`:
+Los dos clientes del robot (`AiroRobot`, que habla bleak, y `BridgeRobot`, que
+habla HTTP con la placa) heredan de `airo_ble.cliente.ClienteRobot`. La clase
+base tiene **lo que no cambia** (los atajos, el ciclo de vida, las consultas) y
+los hijos implementan **lo que cambia** (cómo se habla con el robot).
+
+```python
+# en ClienteRobot (la base)
+async def drive(self, *, left: float = 0.0, right: float = 0.0) -> bytes: ...
+async def servo(self, joint: Joint, angle: float) -> bytes: ...
+async def servos(self, **angles: float) -> bytes: ...
+async def led(self, mode: Led) -> bytes: ...
+async def stop(self) -> bytes: ...
+async def reset(self) -> bytes: ...
+async def reconnect(self) -> None: ...
+async def escanear(self, timeout: float = 10.0) -> dict[str, Any]: ...
+async def estado(self) -> dict[str, Any]: ...
+async def salud(self) -> dict[str, Any]: ...
+```
+
+En `BridgeRobot`, lo específico del puente:
 
 ```python
 async def connect(self) -> None: ...      # POST /conectar
 async def disconnect(self) -> None: ...   # POST /desconectar
 async def send_raw(self, payload: bytes, *, force: bool = False) -> bytes: ...
 async def send(self, command: Command, *, force: bool = False) -> bytes: ...
+async def escanear(self, timeout: float = 10.0) -> dict[str, Any]: ...  # GET /escanear?ms=
 ```
 
 - Cliente HTTP con **`urllib` de la biblioteca estándar**, en un hilo
@@ -127,6 +148,12 @@ async def send(self, command: Command, *, force: bool = False) -> bytes: ...
   `AiroWriteError` / `AiroNotConnected` / `AiroNotFound` con el mensaje del puente.
 - El paquete se manda **solo cuando cambia** (más un latido de 1 Hz por si el
   ESP32 se reinició y perdió el que tenía guardado).
+- **El enlace BLE lo lleva la placa**, no el cliente: por eso el cliente no
+  suelta la conexión cuando algo falla (el campo `conexion_gestionada` lo
+  dice, y la sesión lo respeta).
+- El `escanear` de los dos devuelve **el mismo formato**
+  (`{"dispositivos": [{"mac", "nombre", "rssi"}]}`), así que `airo scan` se ve
+  igual en los dos caminos.
 
 ### 5.2 Selección de backend
 
@@ -144,7 +171,8 @@ AIRO_BRIDGE_URL=http://airo-bridge.local:8080 mise run run
   → `BridgeRobot`; si no → `AiroRobot` (bleak). **Es el único punto donde se
   decide**, así que la consola, la API web, el puente de Scratch y la CLI se
   comportan igual sin tocar su código.
-- `airo_ble/session.py`, `console.py`, `server.py` y `commands.py` usan la fábrica.
+- `airo_ble/session.py`, `console.py`, `server.py` y `commands.py` usan la fábrica
+  (y de tipar el cliente como `ClienteRobot`, no como "uno de estos dos").
 - `bleak` sigue siendo una dependencia normal: el import ya es perezoso
   (`client.py` lo hace dentro de `connect()`), así que con el puente puesto no
   hace falta Bluetooth en el portátil.
@@ -257,6 +285,7 @@ movió un segundo con los 20 bytes que le mandó la placa.
 
 ### Fase 2 — Backend Python (4-6 h) 🟢 hito — **hecha**
 
+- `airo_ble/cliente.py` con la clase base `ClienteRobot` (la interfaz común).
 - `airo_ble/bridge.py` con `BridgeRobot` (y la fábrica `crear_robot`).
 - Selección de backend por `AIRO_BRIDGE_URL` en `session.py`, `commands.py`,
   `console.py` y `server.py`.
@@ -268,6 +297,12 @@ robot a través del ESP32. Los tests en verde.
 **Estado**: **hecha**. El cliente y la API hablan con el puente (verificado
 contra la placa real) y el paquete que llega al robot es el de 20 bytes que
 construye `protocol.py`.
+
+Además, los dos caminos (BLE y puente) quedaron **unificados**: los dos
+clientes heredan de `ClienteRobot`, devuelven el mismo formato y dan los mismos
+errores, así que el código que llama al robot no sabe por dónde va. El test
+`tests/test_bridge.py` compara sus interfaces y falla si a uno le falta un
+método del otro.
 
 ### Fase 3 — Tooling, CI y documentación (4-6 h)
 
@@ -297,7 +332,9 @@ camino que funciona es la IP.
 ### Fase 4 — Robustez (4-8 h, opcional)
 
 - Reconexión si el robot se apaga y se vuelve a encender. *(Hecha: la tarea de
-  fondo del puente reconecta solo.)*
+  fondo del puente reconecta solo. Con `AUTO_CONECTAR = False` la placa no
+  agarra al robot sola, pero el botón "Conectar" de la web vuelve a buscarlo y
+  a engancharlo cuando aparece.)*
 - Watchdog y reinicio limpio del puente.
 - Token simple en las peticiones (si la red no es de fiar).
 - OTA (`mpremote` + `rshell`).

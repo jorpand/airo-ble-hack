@@ -41,7 +41,8 @@ from .client import (
     AiroRobot,
     AiroWriteError,
 )
-from .protocol import Command, Joint, Led
+from .cliente import ClienteRobot
+from .protocol import Command
 
 __all__ = [
     "BridgeRobot",
@@ -60,9 +61,10 @@ TIMEOUT = 20.0
 #: Cuanto se espera a la ruta `/conectar`, en segundos.
 #:
 #: Conectar es lento a proposito: el modulo BLE del robot se duerme y solo
-#: se anuncia unos segundos despues de encenderlo, asi que la placa espera a
-#: que aparezca.
-TIMEOUT_CONEXION = 60.0
+#: se anuncia unos segundos despues de encenderlo, asi que la placa
+#: busca el robot, se conecta y descubre los servicios. Todo eso puede
+#: llevar un minuto.
+TIMEOUT_CONEXION = 90.0
 
 #: Cada cuanto se manda el paquete otra vez aunque no haya cambiado.
 #:
@@ -78,12 +80,12 @@ def url_del_puente() -> str | None:
     return url or None
 
 
-class BridgeRobot:
+class BridgeRobot(ClienteRobot):
     """Habla con el robot a través del puente del ESP32-S3.
 
-    Se usa igual que un `AiroRobot`: tiene `.command`, `.connect()`,
-    `.disconnect()` y `.send()`. La diferencia es que no habla BLE: le
-    manda los bytes al puente por HTTP y el puente los escribe en el robot.
+    Se usa igual que un `AiroRobot` (misma clase base, mismos metodos,
+    mismos errores): la diferencia es que no habla BLE, le manda los bytes
+    al puente por HTTP y el puente los escribe en el robot.
     """
 
     #: El enlace BLE lo lleva la placa (ella escanea, conecta y reconecta
@@ -92,11 +94,9 @@ class BridgeRobot:
     conexion_gestionada = True
 
     def __init__(self, url: str, timeout: float = TIMEOUT) -> None:
+        super().__init__()
         self.url = url.rstrip("/")
         self.timeout = timeout
-        #: El comando con el que se construyen los bytes (igual que en
-        #: `AiroRobot`): quien lo usa cambia sus campos y lo manda.
-        self.command = Command()
         #: La MAC del robot (la dice el puente al conectar). Antes de
         #: conectar, es la URL del puente.
         self.address = self.url
@@ -106,13 +106,6 @@ class BridgeRobot:
         self._ultimo_envio = 0.0
 
     # -- ciclo de vida ----------------------------------------------------
-
-    async def __aenter__(self) -> BridgeRobot:
-        await self.connect()
-        return self
-
-    async def __aexit__(self, *exc_info: object) -> None:
-        await self.disconnect()
 
     @property
     def is_connected(self) -> bool:
@@ -207,35 +200,6 @@ class BridgeRobot:
         self._ultimo_envio = ahora
         return datos
 
-    # -- atajos (los mismos que tiene `AiroRobot`) ------------------------
-
-    async def drive(self, *, left: float = 0.0, right: float = 0.0) -> bytes:
-        """Mueve las ruedas. Rango útil de velocidad: -3..3 (signo = sentido)."""
-        self.command.left_speed = left
-        self.command.right_speed = right
-        return await self.send(self.command)
-
-    async def servo(self, joint: Joint, angle: float) -> bytes:
-        """Mueve una articulación a un ángulo en grados."""
-        self.command.set_joint(joint, angle)
-        return await self.send(self.command)
-
-    async def servos(self, **angles: float) -> bytes:
-        """Mueve varias articulaciones de golpe: `servos(left_arm=30, ...)`."""
-        for key, value in angles.items():
-            self.command.set_joint(Joint[key.upper()], value)
-        return await self.send(self.command)
-
-    async def led(self, mode: Led) -> bytes:
-        """Apaga/enciende/parpadea/funde el LED azul."""
-        self.command.led = mode
-        return await self.send(self.command)
-
-    async def stop(self) -> bytes:
-        """Para las ruedas."""
-        self.command.stop()
-        return await self.send(self.command)
-
     # -- informacion ------------------------------------------------------
 
     async def estado(self) -> dict[str, Any]:
@@ -248,9 +212,14 @@ class BridgeRobot:
         """Comprueba que el puente vive (no que el robot esté)."""
         return await self._peticion("GET", "/salud")
 
-    async def escanear(self) -> dict[str, Any]:
-        """Lo que se ve por BLE ahora mismo."""
-        return await self._peticion("GET", "/escanear")
+    async def escanear(self, timeout: float = 10.0) -> dict[str, Any]:
+        """Escanea con la placa y devuelve lo que se ve.
+
+        El formato es **el mismo que el del cliente BLE**: una lista de
+        dispositivos con su MAC, su nombre y su RSSI.
+        """
+        ms = max(100, min(int(timeout * 1000), 30000))
+        return await self._peticion("GET", f"/escanear?ms={ms}")
 
     # -- HTTP -------------------------------------------------------------
 
@@ -317,7 +286,7 @@ def crear_robot(
     address: str | None = None,
     scan_timeout: float = 15.0,
     **kwargs: Any,
-) -> AiroRobot | BridgeRobot:
+) -> ClienteRobot:
     """Crea el cliente del robot.
 
     Si está `AIRO_BRIDGE_URL`, el cliente habla con el puente del ESP32-S3;

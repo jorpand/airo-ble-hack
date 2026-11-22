@@ -27,41 +27,25 @@ from .protocol import JOINT_NAMES, Command, Led
 async def cmd_scan(args: argparse.Namespace) -> int:
     """Lista los dispositivos BLE visibles.
 
-    Si hay un puente configurado (`AIRO_BRIDGE_URL`), el escaneo lo hace la
-    placa (que es la que tiene el radio cerca del robot).
+    Usa el mismo cliente que todo lo demas: si hay un puente configurado
+    (`AIRO_BRIDGE_URL`), el escaneo lo hace la placa (que tiene el radio
+    cerca del robot); si no, lo hace el portatil con bleak.
     """
-    from .bridge import BridgeRobot, url_del_puente
+    from .bridge import crear_robot
 
-    url = url_del_puente()
-    if url:
-        robot = BridgeRobot(url)
-        print(f"Escaneando con el puente {url}...")
-        datos = await robot.escanear()
-        dispositivos = datos.get("dispositivos") or []
-        if not dispositivos:
-            print("No se ha visto ningún dispositivo BLE.")
-            return 1
-        for dev in dispositivos:
-            print(
-                f"  {dev.get('mac', '?')}  {dev.get('nombre', ''):22s}"
-                f"  rssi={dev.get('rssi', '?')}"
-            )
-        return 0
-
-    from bleak import BleakScanner
-
-    print(f"Escaneando {args.timeout:.0f} s...")
-    devices = await BleakScanner.discover(timeout=args.timeout, return_adv=True)
-    if not devices:
+    robot = crear_robot()
+    donde = f"con el puente {robot.url}" if robot.url else "desde el portatil"
+    print(f"Escaneando {args.timeout:.0f} s {donde}...")
+    datos = await robot.escanear(args.timeout)
+    dispositivos = datos.get("dispositivos") or []
+    if not dispositivos:
         print("No se ha visto ningún dispositivo BLE.")
         return 1
-    # bleak <= 2.x: dict[BLEDevice, AdvertisementData]
-    # bleak >= 3.x: dict[str, tuple[BLEDevice, AdvertisementData]]
-    for value in devices.values():
-        dev, adv = value if isinstance(value, tuple) else (value, None)
-        name = getattr(adv, "local_name", None) or getattr(dev, "name", None) or "(sin nombre)"
-        uuids = ",".join(getattr(adv, "service_uuids", None) or [])
-        print(f"  {dev.address}  {name:22s}  rssi={getattr(adv, 'rssi', '?')}  {uuids}")
+    for dev in dispositivos:
+        print(
+            f"  {dev.get('mac', '?'):18s}  {dev.get('nombre', ''):22s}"
+            f"  rssi={dev.get('rssi', '?')}"
+        )
     return 0
 
 

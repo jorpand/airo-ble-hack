@@ -41,20 +41,35 @@ FALLOS_MAX = 3
 
 #: Cuanto escanea la ruta `/escanear` (milisegundos).
 #:
-#: Es corto a proposito: la ruta tiene que responder rapido y el escaneo
-#: largo lo hace la tarea de fondo.
+#: Es corto a proposito: la ruta tiene que responder rapido. El escaneo
+#: largo lo hace la ruta `/conectar`, que es la que busca al robot.
 ESCANEO_MS = 3000
 
-#: Cuanto espera la ruta `/conectar` a que la tarea de fondo pille al robot
-#: (milisegundos). El robot se anuncia a ratos, asi que esto es un rato.
-ESPERA_CONEXION_MS = 30000
+#: Cuanto busca la ruta `/conectar` al robot (milisegundos).
+#:
+#: El robot se anuncia a ratos, asi que esto es un rato.
+ESPERA_BUSQUEDA_MS = 15000
+
+#: Si la placa se conecta al robot **sola**, en cuanto lo ve.
+#:
+#: Con False (lo normal), el robot se conecta solo cuando alguien lo pide
+#: (`POST /conectar`), que es lo que hace el boton "Conectar" de la web: el
+#: robot se queda como esta hasta que se le pide. Con True, la placa lo
+#: pilla en cuanto aparece y lo mantiene (comodo si el robot se duerme, pero
+#: el enlace se queda abierto solo).
+AUTO_CONECTAR = False
 
 
 class Puente:
     """El puente: une el HTTP con el BLE."""
 
-    def __init__(self):
+    def __init__(self, auto_conectar=AUTO_CONECTAR):
         self.cliente = ble_robot.ClienteAiro()
+        #: Si la placa agarra al robot por su cuenta.
+        self.auto_conectar = auto_conectar
+        #: La busqueda y la conexion van en un solo candado: si dos
+        #: peticiones de "conectar" se pisan, se pelean por el robot.
+        self.lock_conexion = asyncio.Lock()
 
     # -- Rutas -------------------------------------------------------------
 
@@ -67,8 +82,20 @@ class Puente:
         return 200, self.cliente.estado()
 
     async def r_escanear(self, peticion):
-        """Lo que se ve por BLE ahora mismo."""
-        vistos = await self.cliente.escanear(ESCANEO_MS)
+        """Lo que se ve por BLE ahora mismo.
+
+        Acepta `?ms=` para decir cuanto escanea (por defecto, `ESCANEO_MS`).
+        """
+        ms = ESCANEO_MS
+        if "?" in peticion.ruta:
+            for parte in peticion.ruta.split("?", 1)[1].split("&"):
+                clave, _, valor = parte.partition("=")
+                if clave == "ms":
+                    try:
+                        ms = int(valor)
+                    except ValueError:
+                        pass
+        vistos = await self.cliente.escanear(max(100, min(ms, 30000)))
         dispositivos = [
             {"mac": ble_robot.mac(addr), "nombre": nombre, "rssi": rssi}
             for addr, (_t, nombre, rssi) in vistos.items()
@@ -86,23 +113,34 @@ class Puente:
         return 200, {"ok": True, "bytes": len(datos)}
 
     async def r_conectar(self, peticion):
-        """Espera a que el robot este conectado.
+        """Busca al robot y se conecta (a peticion).
 
-        OJO: esta ruta **no escanea**. El escaneo lo hace la tarea de fondo
-        (`mantener_conexion`), que esta siempre mirando por el robot: si
-        esta ruta escaneara tambien, las dos cosas se pelearian por el radio
-        (NimBLE no admite dos escaneos a la vez y contesta `EALREADY`).
+        OJO: esto escanea, conecta y descubre. Con `AUTO_CONECTAR` a False
+        la placa **no** agarra al robot por su cuenta: se conecta cuando
+        alguien lo pide (el boton "Conectar" de la web, o el propio cliente
+        cuando se reconecta).
 
-        Asi que aqui solo se espera a que la tarea de fondo lo pille.
+        Todo el proceso va con un candado, para que dos peticiones de
+        "conectar" no se peleen por el robot.
         """
-        if self.cliente.conn >= 0:
-            return 200, {"ok": True, "mac": self.cliente.mac_robot, "ya_conectado": True}
-        ok = await ble_robot.esperar_hasta(
-            lambda: self.cliente.conn >= 0, ESPERA_CONEXION_MS
-        )
-        if not ok:
-            return 409, {"ok": False, "error": "no se encuentra el robot"}
-        return 200, {"ok": True, "mac": self.cliente.mac_robot}
+        async with self.lock_conexion:
+            if self.cliente.conn >= 0:
+                return 200, {
+                    "ok": True,
+                    "mac": self.cliente.mac_robot,
+                    "ya_conectado": True,
+                }
+            addr, addr_type = await self.cliente.buscar_robot(
+                ESPERA_BUSQUEDA_MS, 5000, sondear=False
+            )
+            if addr is None or addr_type is None:
+                return 409, {"ok": False, "error": "no se encuentra el robot"}
+            if not await self.cliente.conectar(addr, addr_type, 25000, 20000):
+                return 409, {"ok": False, "error": self.cliente.error}
+            if not await self.cliente.descubrir(15000):
+                self.cliente.desconectar()
+                return 409, {"ok": False, "error": self.cliente.error}
+            return 200, {"ok": True, "mac": self.cliente.mac_robot}
 
     async def r_desconectar(self, peticion):
         """Cierra la conexion con el robot."""
@@ -123,7 +161,11 @@ class Puente:
     # -- Mantenimiento -----------------------------------------------------
 
     async def mantener_conexion(self):
-        """Se conecta al robot en cuanto aparece y se reconecta si se cae."""
+        """Se conecta al robot en cuanto aparece y se reconecta si se cae.
+
+        Solo se usa con `AUTO_CONECTAR` a True: si esta a False, el robot se
+        conecta solo cuando alguien lo pide.
+        """
         while True:
             if self.cliente.conn < 0:
                 addr, addr_type = await self.cliente.buscar_robot(

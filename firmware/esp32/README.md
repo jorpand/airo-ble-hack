@@ -96,9 +96,9 @@ se sacan con `--reset`.
 |---|---|
 | `GET /salud` | `{"ok": true, "servidor": "airo-bridge"}` |
 | `GET /estado` | conexión, MAC, paquetes, último error, bytes guardados |
-| `GET /escanear` | lo que se ve por BLE ahora mismo |
+| `GET /escanear` | lo que se ve por BLE ahora mismo (acepta `?ms=`) |
 | `POST /escribir` | escribe el cuerpo (bytes crudos) en `FFF1` |
-| `POST /conectar` | espera a que la tarea de fondo pille al robot |
+| `POST /conectar` | **busca el robot y se conecta** (tarda: el robot se duerme) |
 | `POST /desconectar` | cierra la conexión BLE |
 
 ```bash
@@ -106,6 +106,17 @@ curl http://192.168.1.147:8080/salud
 curl http://192.168.1.147:8080/estado
 curl -X POST --data-binary @paquete.bin http://192.168.1.147:8080/escribir
 ```
+
+### La placa no agarra al robot sola
+
+Por defecto (`AUTO_CONECTAR = False` en `puente.py`) la placa **no se
+conecta al robot por su cuenta**: se conecta cuando alguien se lo pide
+(`POST /conectar`), que es lo que hace el botón "Conectar" de la web. El
+robot se queda como está hasta entonces.
+
+Con `AUTO_CONECTAR = True` la placa lo pilla en cuanto aparece y lo mantiene
+(conveniente si el robot se duerme mucho, pero el enlace se queda abierto
+solo). Se cambia en `puente.py` y se despliega con `mise run firmware-deploy`.
 
 ## La WiFi
 
@@ -169,8 +180,8 @@ GATTC_WRITE_DONE       (conn_handle, value_handle, status)
   devuelve los brazos al reposo si deja de recibir paquetes, así que el paquete
   tiene que ir sin parar; y hacerlo desde el portátil serían 20 peticiones HTTP
   por segundo. El portátil solo manda el paquete cuando **cambia**.
-- **Solo hay un escaneo a la vez.** Por eso las rutas HTTP no escanean: esperan a
-  la tarea de fondo (`mantener_conexion`), que es la que busca al robot.
+- **Solo hay un escaneo a la vez.** Por eso las rutas HTTP no escanean a la
+  vez que la de conectar: cada escaneo y cada conexión van con su candado.
 - **Y solo hay una escritura a la vez.** La tarea de refresco (que reenvía el
   último paquete cada 50 ms) y las peticiones HTTP de `/escribir` van con un
   candado: si se solapan, el robot contesta con error y se cae el enlace.

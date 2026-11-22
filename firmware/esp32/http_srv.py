@@ -80,6 +80,11 @@ async def _atender(reader, writer, rutas):
             return
         metodo, ruta = partes[0].upper(), partes[1]
 
+        # La ruta puede traer parametros ("/escanear?ms=5000"): se buscan
+        # con la ruta pelada, pero el manejador recibe la ruta entera para
+        # poder leer los parametros.
+        ruta_pelada = ruta.split("?", 1)[0]
+
         # Cabeceras
         cabeceras = {}
         while True:
@@ -94,9 +99,9 @@ async def _atender(reader, writer, rutas):
         largo = int(cabeceras.get("content-length", 0) or 0)
         cuerpo = await reader.read(largo) if largo else b""
 
-        manejador = rutas.get((metodo, ruta))
+        manejador = rutas.get((metodo, ruta_pelada))
         if manejador is None:
-            await _escribir(writer, _json(404, {"error": f"no hay ruta {metodo} {ruta}"}))
+            await _escribir(writer, _json(404, {"error": f"no hay ruta {metodo} {ruta_pelada}"}))
             return
 
         peticion = Peticion(metodo, ruta, cabeceras, cuerpo)

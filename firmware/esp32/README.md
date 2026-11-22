@@ -82,11 +82,12 @@ se sacan con `--reset`.
 
 | Fichero | Qué hace |
 |---|---|
-| `main.py` | arranque: WiFi + servidor HTTP + conexión BLE + refresco |
+| `main.py` | arranque: WiFi + servidor HTTP + conexión BLE + refresco + LED |
 | `puente.py` | las rutas del puente y el mantenimiento de la conexión |
 | `ble_robot.py` | cliente BLE: escanear, conectar, descubrir, escribir, refrescar |
 | `http_srv.py` | servidor HTTP mínimo sobre `asyncio.start_server` |
 | `wifi.py` | conexión a la WiFi (las credenciales van en `wifi.json`) |
+| `led.py` | el LED RGB: el color es el estado, el destello es la actividad |
 | `spike.py` | el spike de la Fase 0, ejecutable a pelo |
 | `mip.json` | metadatos de `mip` (sin dependencias externas) |
 
@@ -95,7 +96,7 @@ se sacan con `--reset`.
 | Ruta | Qué hace |
 |---|---|
 | `GET /salud` | `{"ok": true, "servidor": "airo-bridge"}` |
-| `GET /estado` | conexión, MAC, paquetes, último error, bytes guardados |
+| `GET /estado` | conexión, MAC, paquetes, último error, bytes guardados, color del LED |
 | `GET /escanear` | lo que se ve por BLE ahora mismo (acepta `?ms=`) |
 | `POST /escribir` | escribe el cuerpo (bytes crudos) en `FFF1` |
 | `POST /conectar` | **busca el robot y se conecta** (tarda: el robot se duerme) |
@@ -117,6 +118,41 @@ robot se queda como está hasta entonces.
 Con `AUTO_CONECTAR = True` la placa lo pilla en cuanto aparece y lo mantiene
 (conveniente si el robot se duerme mucho, pero el enlace se queda abierto
 solo). Se cambia en `puente.py` y se despliega con `mise run firmware-deploy`.
+
+## El LED RGB
+
+La placa lleva un LED RGB **direccionable** (un WS2812) que dice en qué estado
+está el puente:
+
+| Color | Cuándo |
+|---|---|
+| 🔴 rojo | no hay nada conectado |
+| 🔵 azul | se está buscando al robot |
+| 🟢 verde | el robot está conectado |
+
+Y **parpadea del color que tenga** cuando hay tráfico de comandos.
+
+Cosas que conviene saber:
+
+- El WS2812 está en el **GPIO48** en las placas rev. 1.0 y en el **GPIO38** en
+  las rev. 1.1. El chip no dice qué revisión es, así que `led.py` maneja **los
+  dos pines**: el que no tenga el LED enganchado no hace nada.
+- El LED se gestiona con el módulo `neopixel` de MicroPython (que va con
+  `machine.bitstream`, o sea, con el RMT del ESP32: no es bit-bang). El driver
+  ya reordena a GRB, así que los colores se dan como `(r, g, b)` de toda la
+  vida.
+- El **destello es un overlay**, no un cuarto color: el LED se apaga y se
+  enciende un par de veces *con el color del estado*. Así se sigue viendo en
+  qué estado está el enlace mientras hay tráfico.
+- El puente **no recibe comandos del robot** (el robot no los manda), así que
+  el parpadeo se provoca con la ruta `/escribir`: al leer el cuerpo de la
+  petición y al mandarlo al robot.
+- `GET /estado` también enseña el color (`"led": "rojo"`) y cuántos parpadeos
+  ha habido (`"led_parpadeos": 12`), para ver el estado del puente desde el
+  portátil sin poder mirar la placa: los parpadeos son los comandos que han
+  llegado al puente.
+- Si una placa no tuviera WS2812 (o el módulo `neopixel` no estuviera), el
+  puente **sigue funcionando igual**: solo se pierde el LED.
 
 ## La WiFi
 

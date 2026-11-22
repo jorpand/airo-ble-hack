@@ -24,6 +24,7 @@ import asyncio
 
 import ble_robot
 import http_srv
+import led
 
 #: Puerto del servidor HTTP del puente.
 PUERTO = 8080
@@ -63,13 +64,37 @@ AUTO_CONECTAR = False
 class Puente:
     """El puente: une el HTTP con el BLE."""
 
-    def __init__(self, auto_conectar=AUTO_CONECTAR):
+    def __init__(self, auto_conectar=AUTO_CONECTAR, indicador=None):
         self.cliente = ble_robot.ClienteAiro()
         #: Si la placa agarra al robot por su cuenta.
         self.auto_conectar = auto_conectar
         #: La busqueda y la conexion van en un solo candado: si dos
         #: peticiones de "conectar" se pisan, se pelean por el robot.
         self.lock_conexion = asyncio.Lock()
+        #: El LED RGB de la placa: el color es el estado del enlace y el
+        #: destello es la actividad (trafico de comandos).
+        self.led = indicador if indicador is not None else led.Led()
+        #: Si se esta buscando al robot (el LED esta en azul).
+        self.buscando = False
+        self.actualizar_led()
+
+    # -- El LED ------------------------------------------------------------
+
+    def color_led(self):
+        """El color que le toca al LED segun el estado del enlace."""
+        if self.cliente.conn >= 0:
+            return led.VERDE
+        if self.buscando:
+            return led.AZUL
+        return led.ROJO
+
+    def actualizar_led(self):
+        """Pone el LED en el color del estado actual."""
+        self.led.estado(self.color_led())
+
+    def parpadear(self):
+        """Manda parpadear el LED: hay trafico de comandos."""
+        self.led.destello()
 
     # -- Rutas -------------------------------------------------------------
 
@@ -79,7 +104,13 @@ class Puente:
 
     async def r_estado(self, peticion):
         """Como esta la conexion con el robot."""
-        return 200, self.cliente.estado()
+        estado = self.cliente.estado()
+        # El color del LED va aqui tambien: desde el portatil se puede ver
+        # en que estado esta el puente sin poder ver la placa. Y los
+        # parpadeos: cuantos comandos han llegado al puente.
+        estado["led"] = led.nombre(self.color_led())
+        estado["led_parpadeos"] = self.led.parpadeos
+        return 200, estado
 
     async def r_escanear(self, peticion):
         """Lo que se ve por BLE ahora mismo.
@@ -95,7 +126,13 @@ class Puente:
                         ms = int(valor)
                     except ValueError:
                         pass
-        vistos = await self.cliente.escanear(max(100, min(ms, 30000)))
+        self.buscando = True
+        self.actualizar_led()
+        try:
+            vistos = await self.cliente.escanear(max(100, min(ms, 30000)))
+        finally:
+            self.buscando = False
+            self.actualizar_led()
         dispositivos = [
             {"mac": ble_robot.mac(addr), "nombre": nombre, "rssi": rssi}
             for addr, (_t, nombre, rssi) in vistos.items()
@@ -107,6 +144,9 @@ class Puente:
         datos = peticion.cuerpo
         if not datos:
             return 400, {"error": "cuerpo vacio"}
+        # Hay trafico de comandos (se han leido del HTTP y se mandan al
+        # robot): el LED parpadea del color que tenga.
+        self.parpadear()
         ok = await self.cliente.escribir(datos)
         if not ok:
             return 409, {"error": self.cliente.error or "no se pudo escribir"}
@@ -125,26 +165,35 @@ class Puente:
         """
         async with self.lock_conexion:
             if self.cliente.conn >= 0:
+                self.actualizar_led()
                 return 200, {
                     "ok": True,
                     "mac": self.cliente.mac_robot,
                     "ya_conectado": True,
                 }
-            addr, addr_type = await self.cliente.buscar_robot(
-                ESPERA_BUSQUEDA_MS, 5000, sondear=False
-            )
-            if addr is None or addr_type is None:
-                return 409, {"ok": False, "error": "no se encuentra el robot"}
-            if not await self.cliente.conectar(addr, addr_type, 25000, 20000):
-                return 409, {"ok": False, "error": self.cliente.error}
-            if not await self.cliente.descubrir(15000):
-                self.cliente.desconectar()
-                return 409, {"ok": False, "error": self.cliente.error}
-            return 200, {"ok": True, "mac": self.cliente.mac_robot}
+            # Mientras se busca, el LED esta en azul.
+            self.buscando = True
+            self.actualizar_led()
+            try:
+                addr, addr_type = await self.cliente.buscar_robot(
+                    ESPERA_BUSQUEDA_MS, 5000, sondear=False
+                )
+                if addr is None or addr_type is None:
+                    return 409, {"ok": False, "error": "no se encuentra el robot"}
+                if not await self.cliente.conectar(addr, addr_type, 25000, 20000):
+                    return 409, {"ok": False, "error": self.cliente.error}
+                if not await self.cliente.descubrir(15000):
+                    self.cliente.desconectar()
+                    return 409, {"ok": False, "error": self.cliente.error}
+                return 200, {"ok": True, "mac": self.cliente.mac_robot}
+            finally:
+                self.buscando = False
+                self.actualizar_led()
 
     async def r_desconectar(self, peticion):
         """Cierra la conexion con el robot."""
         self.cliente.desconectar()
+        self.actualizar_led()
         return 200, {"ok": True}
 
     def rutas(self):
@@ -168,9 +217,13 @@ class Puente:
         """
         while True:
             if self.cliente.conn < 0:
+                self.buscando = True
+                self.actualizar_led()
                 addr, addr_type = await self.cliente.buscar_robot(
                     15000, 5000, sondear=False
                 )
+                self.buscando = False
+                self.actualizar_led()
                 if addr is not None and addr_type is not None:
                     print("robot encontrado, conectando...")
                     if await self.cliente.conectar(addr, addr_type, 25000, 20000):
@@ -197,6 +250,9 @@ class Puente:
         """
         while True:
             await asyncio.sleep(REFRESCO_MS / 1000)
+            # El LED va con el estado: si el robot se duerme y se cae el
+            # enlace, el LED pasa a rojo solo (sin esperar a una peticion).
+            self.actualizar_led()
             if self.cliente.conn < 0 or not self.cliente.ultimo:
                 continue
             if self.cliente.fallos >= FALLOS_MAX:

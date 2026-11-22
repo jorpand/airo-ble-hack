@@ -158,7 +158,7 @@ run = """
 PUERTO="${AIRO_SERIAL:-$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -1)}"
 if [ -z "$PUERTO" ]; then echo "no se encuentra el ESP32-S3 (¿esta enchufado?)"; exit 1; fi
 echo "Puerto: $PUERTO"
-for f in main.py puente.py ble_robot.py http_srv.py wifi.py spike.py; do
+for f in main.py puente.py ble_robot.py http_srv.py wifi.py spike.py led.py; do
     $AIRO_PYTHON -m mpremote connect "$PUERTO" fs cp {{config_root}}/firmware/esp32/$f :$f
     sleep 1
 done

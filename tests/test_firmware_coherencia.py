@@ -23,7 +23,7 @@ FIRMWARE = RAIZ / "firmware" / "esp32"
 STUBS = RAIZ / "firmware" / "stubs"
 
 #: Los modulos que son de la placa y no existen en CPython.
-DE_MICROPYTHON = {"bluetooth", "network"}
+DE_MICROPYTHON = {"bluetooth", "network", "machine", "neopixel"}
 
 
 def _version_del_firmware() -> str:
@@ -74,12 +74,13 @@ def test_todo_modulo_de_micropython_tiene_su_stub() -> None:
             if not coincidencia:
                 continue
             modulo = coincidencia.group(1).split(".")[0]
-            if modulo in sys.stdlib_module_names or modulo in DE_MICROPYTHON:
+            if modulo in sys.stdlib_module_names:
                 continue
             # Los modulos del propio firmware (wifi, puente, ble_robot...)
             if (FIRMWARE / f"{modulo}.py").exists():
                 continue
-            sin_stub.append(f"{fichero.name}: {modulo}")
+            if not (STUBS / f"{modulo}.pyi").exists():
+                sin_stub.append(f"{fichero.name}: {modulo}")
     assert not sin_stub, f"modulos sin stub: {sin_stub}"
 
 
@@ -87,7 +88,15 @@ def test_los_stubs_cubren_los_modulos_de_la_placa() -> None:
     """Los stubs que existen tienen que estar al día con lo que se usa."""
     assert (STUBS / "bluetooth.pyi").exists()
     assert (STUBS / "network.pyi").exists()
+    assert (STUBS / "machine.pyi").exists()
+    assert (STUBS / "neopixel.pyi").exists()
+    for modulo in sorted(DE_MICROPYTHON):
+        assert (STUBS / f"{modulo}.pyi").exists(), modulo
     stub_bluetooth = (STUBS / "bluetooth.pyi").read_text(encoding="utf-8")
     # El firmware usa `gap_scan`, `gap_connect` y las escrituras.
     for metodo in ("gap_scan", "gap_connect", "gattc_write", "gattc_discover_services"):
         assert metodo in stub_bluetooth, metodo
+    stub_neopixel = (STUBS / "neopixel.pyi").read_text(encoding="utf-8")
+    # El LED usa `NeoPixel`, `fill` y `write`.
+    for metodo in ("NeoPixel", "fill", "write"):
+        assert metodo in stub_neopixel, metodo
